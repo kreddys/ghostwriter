@@ -1,7 +1,13 @@
 {
-  "dependencies": ["."],
+  "dockerfile_lines": [],
   "graphs": {
     "agent": "./src/react_agent/graph.py:graph"
   },
-  "env": ".env"
+  "env": [
+    "TAVILY_API_KEY"
+  ],
+  "python_version": "3.11",
+  "dependencies": [
+    "."
+  ]
 }

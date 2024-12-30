@@ -1,0 +1,1 @@
+source /users/kishorereddy/development/python/venv/bin/activate
