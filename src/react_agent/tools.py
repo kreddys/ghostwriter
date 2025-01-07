@@ -1,7 +1,7 @@
 """This module provides example tools for web scraping and search functionality."""
 from typing import Annotated, Any, Optional, Dict, List
 from langchain_core.runnables import RunnableConfig
-from langchain.tools import InjectedToolArg
+from langchain_core.tools import InjectedToolArg
 from tavily import TavilyClient, InvalidAPIKeyError, MissingAPIKeyError, UsageLimitExceededError
 from .configuration import Configuration
 from .state import State
@@ -23,7 +23,9 @@ async def search(
             max_results=configuration.max_search_results,
             include_answer=True,
             include_raw_content=True,
-            include_images=True
+            include_images=True,
+            topic="general",
+            days=1
         )
         
         # Process and structure the results
