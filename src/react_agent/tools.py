@@ -21,16 +21,7 @@ async def search(
     query: str, *, config: Annotated[RunnableConfig, InjectedToolArg], 
     state: State
 ) -> Optional[list[dict[str, Any]]]:
-    """Search the web for current information using Tavily search engine.
-
-    Args:
-        query: The search query to look up
-        config: Configuration for the search operation
-        state: Current state object containing search history
-
-    Returns:
-        A list of search results as dictionaries, or None if no results found
-    """
+    """Search the web for current information using Tavily search engine."""
     # Normalize the query to prevent similar searches
     normalized_query = normalize_date_query(query)
     
@@ -40,14 +31,62 @@ async def search(
     
     # Perform search and store results
     configuration = Configuration.from_runnable_config(config)
-    wrapped = TavilySearchResults(max_results=configuration.max_search_results, include_images=True)
+    wrapped = TavilySearchResults(
+        max_results=configuration.max_search_results,
+        search_depth="advanced",
+        include_answer=False,
+        include_raw_content=True,
+        include_images=True,
+        topic="News",
+        days=1,
+    )
+    
     result = await wrapped.ainvoke({"query": query})
+    
+    # Process and structure the results
+    processed_results = []
+    
+    # Extract data from the artifact if available
+    if isinstance(result, dict) and 'artifact' in result:
+        artifact = result['artifact']
+        
+        # Add AI-generated answer if available
+        if artifact.get('answer'):
+            processed_results.append({
+                'type': 'answer',
+                'content': artifact['answer']
+            })
+        
+        # Add images if available
+        if artifact.get('images'):
+            processed_results.append({
+                'type': 'images',
+                'content': artifact['images']
+            })
+        
+        # Add text results
+        if artifact.get('results'):
+            for item in artifact['results']:
+                processed_results.append({
+                    'type': 'text',
+                    'title': item.get('title', 'N/A'),
+                    'url': item.get('url', 'N/A'),
+                    'content': item.get('content', 'N/A')
+                })
+    else:
+        # Handle direct results (non-artifact format)
+        processed_results.extend([{
+            'type': 'text',
+            'title': item.get('title', 'N/A'),
+            'url': item.get('url', 'N/A'),
+            'content': item.get('content', 'N/A')
+        } for item in (result if isinstance(result, list) else [])])
     
     # Store results for future reference
     state.previous_searches.add(normalized_query)
-    state.search_results[normalized_query] = result
+    state.search_results[normalized_query] = processed_results
     
-    return result
+    return processed_results
 
 def normalize_date_query(query: str) -> str:
     """Normalize date-related terms in queries to prevent duplicates"""
