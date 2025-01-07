@@ -3,10 +3,7 @@
   "graphs": {
     "agent": "./src/react_agent/graph.py:graph"
   },
-  "env": [
-    "TAVILY_API_KEY",
-    "DEEPSEEK_API_KEY"
-  ],
+  "env": ".env",
   "python_version": "3.11",
   "dependencies": [
     "."
