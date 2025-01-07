@@ -4,7 +4,7 @@ Works with a chat model with tool calling support.
 """
 import os
 from datetime import datetime, timezone
-from typing import Dict, List, Literal, cast
+from typing import Any, Dict, List, Literal, cast
 
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
@@ -78,15 +78,22 @@ builder.add_edge("__start__", "call_model")
 
 
 def route_model_output(state: State) -> Literal["__end__", "tools"]:
-    """Determine the next node based on the model's output."""
     last_message = state.messages[-1]
-    if not isinstance(last_message, AIMessage):
-        raise ValueError(
-            f"Expected AIMessage in output edges, but got {type(last_message).__name__}"
-        )
-    # If there is no tool call, then we finish
+    
+    # If there are no tool calls, end the conversation
     if not last_message.tool_calls:
         return "__end__"
+    
+    # Check for redundant search queries
+    for tool_call in last_message.tool_calls:
+        if tool_call.name == "search":
+            query = tool_call.args.get("query", "")
+            normalized_query = normalize_date_query(query)
+            
+            # If we've already searched something similar, end the conversation
+            if normalized_query in state.previous_searches:
+                return "__end__"
+    
     return "tools"
 
 

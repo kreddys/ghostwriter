@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Sequence
+from typing import Any, Sequence
 
 from langchain_core.messages import AnyMessage
 from langgraph.graph import add_messages
@@ -58,3 +58,6 @@ class State(InputState):
     # retrieved_documents: List[Document] = field(default_factory=list)
     # extracted_entities: Dict[str, Any] = field(default_factory=dict)
     # api_connections: Dict[str, Any] = field(default_factory=dict)
+    # Add new fields to track searches
+    previous_searches: set[str] = field(default_factory=set)
+    search_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
