@@ -15,6 +15,13 @@ async def google_search(
     """Search the web using Google Custom Search API."""
     try:
         configuration = Configuration.from_runnable_config(config)
+
+        # Get API keys from environment variables
+        google_api_key = os.getenv("GOOGLE_API_KEY")
+        google_cse_id = os.getenv("GOOGLE_CSE_ID")        
+
+        if not google_api_key or not google_cse_id:
+            raise ValueError("Google API key or CSE ID not found in environment variables")
         
         # Initialize Google Custom Search API client
         service = build("customsearch", "v1", developerKey=configuration.google_api_key)
