@@ -40,7 +40,7 @@ async def search(
     
     # Perform search and store results
     configuration = Configuration.from_runnable_config(config)
-    wrapped = TavilySearchResults(max_results=configuration.max_search_results)
+    wrapped = TavilySearchResults(max_results=configuration.max_search_results, include_images=True)
     result = await wrapped.ainvoke({"query": query})
     
     # Store results for future reference
