@@ -33,7 +33,7 @@ async def search_web(state: State, config: RunnableConfig) -> State:
     return state
 
 async def generate_article(state: State, config: RunnableConfig) -> Dict[str, List[AIMessage]]:
-    """Second step: Generate consolidated article from search results."""
+    """Second step: Generate multiple articles from search results, organized by topic."""
     configuration = Configuration.from_runnable_config(config)
     
     if configuration.model.startswith("deepseek/"):
@@ -66,16 +66,42 @@ async def generate_article(state: State, config: RunnableConfig) -> Dict[str, Li
     ])
 
     messages = [
-        SystemMessage(content="You are a skilled writer. Using the provided search results, "
-                            "create a well-organized, comprehensive article that synthesizes "
-                            "the information. Use a professional tone and ensure the article "
-                            "flows naturally."),
+        SystemMessage(content="""You are a skilled writer and content organizer. Using the provided search results:
+        1. Identify distinct topics or themes in the search results
+        2. Create multiple articles, one for each major topic
+        3. Each article should have:
+           - A clear, descriptive title
+           - Well-organized content that synthesizes information from relevant search results
+        4. Format each article as:
+           [ARTICLE_START]
+           Title: <article title>
+           Content: <article content>
+           [ARTICLE_END]
+        
+        Use a professional tone and ensure each article flows naturally."""),
         HumanMessage(content=f"Here are the search results:\n\n{search_results_text}\n\n"
-                            f"Please create a consolidated article based on these results.")
+                            f"Please create multiple articles, organizing the information by topic.")
     ]
 
     response = await model.ainvoke(messages)
-    return {"messages": [response]}
+    
+    # Process the response to split it into multiple articles
+    content = response.content
+    articles = []
+    
+    # Split the content into individual articles
+    raw_articles = content.split("[ARTICLE_START]")
+    for article in raw_articles:
+        if article.strip():  # Skip empty strings
+            article = article.split("[ARTICLE_END]")[0].strip()
+            if "Title:" in article and "Content:" in article:
+                articles.append(article)
+    
+    # Create a formatted response combining all articles
+    formatted_response = "Multiple articles generated from the search results:\n\n"
+    formatted_response += "\n\n---\n\n".join(articles)
+    
+    return {"messages": [AIMessage(content=formatted_response)]}
 
 def create_graph() -> StateGraph:
     """Create the graph with two simple steps: search and generate."""
