@@ -21,6 +21,16 @@ async def search(
     query: str, *, config: Annotated[RunnableConfig, InjectedToolArg], 
     state: State
 ) -> Optional[list[dict[str, Any]]]:
+    """Search the web for current information using Tavily search engine.
+
+    Args:
+        query: The search query to look up
+        config: Configuration for the search operation
+        state: Current state object containing search history
+
+    Returns:
+        A list of search results as dictionaries, or None if no results found
+    """
     # Normalize the query to prevent similar searches
     normalized_query = normalize_date_query(query)
     
