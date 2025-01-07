@@ -11,33 +11,41 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph
 from langgraph.prebuilt import ToolNode
 from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 
 from react_agent.configuration import Configuration
 from react_agent.state import InputState, State
 from react_agent.tools import TOOLS
 
 
-async def call_model(
-    state: State, config: RunnableConfig
-) -> Dict[str, List[AIMessage]]:
+async def call_model(state: State, config: RunnableConfig) -> Dict[str, List[AIMessage]]:
     """Call the LLM powering our "agent"."""
     configuration = Configuration.from_runnable_config(config)
 
-    # Initialize Ollama model
-    model = ChatOllama(
-        model=configuration.model.split('/')[1],  # Extract model name from "ollama/model"
-        base_url="http://host.docker.internal:11434",
-            temperature = 0.8,
+    if configuration.model.startswith("deepseek/"):
+        # Initialize DeepSeek model using OpenAI-compatible interface
+        model = ChatOpenAI(
+            model="deepseek-chat",  # DeepSeek's model name
+            openai_api_key=os.getenv("DEEPSEEK_API_KEY"),
+            openai_api_base="https://api.deepseek.com/v1",  # DeepSeek's API endpoint
+            temperature=0.8,
+            max_tokens=4096,
+        ).bind_tools(TOOLS)
+    else:
+        # Existing Ollama model initialization
+        model = ChatOllama(
+            model=configuration.model.split('/')[1],
+            base_url="http://host.docker.internal:11434",
+            temperature=0.8,
             num_ctx=8192,
-            num_predict = 4096,
-    ).bind_tools(TOOLS)
+            num_predict=4096,
+        ).bind_tools(TOOLS)
 
-    # Format the system prompt
+    # Rest of the function remains the same
     system_message = configuration.system_prompt.format(
         system_time=datetime.now(tz=timezone.utc).isoformat()
     )
 
-    # Get the model's response
     response = cast(
         AIMessage,
         await model.ainvoke(
@@ -45,7 +53,6 @@ async def call_model(
         ),
     )
 
-    # Handle the case when it's the last step and the model still wants to use a tool
     if state.is_last_step and response.tool_calls:
         return {
             "messages": [
