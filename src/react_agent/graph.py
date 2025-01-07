@@ -12,10 +12,10 @@ from langchain_openai import ChatOpenAI
 
 from react_agent.configuration import Configuration
 from react_agent.state import InputState, State
-from react_agent.tools import search
+from react_agent.tools import combined_search
 
 async def search_web(state: State, config: RunnableConfig) -> State:
-    """First step: Search the web for articles."""
+    """First step: Search the web for articles using both Tavily and Google."""
     # Initialize search results dictionary if not exists
     if not hasattr(state, 'search_results'):
         state.search_results = {}
@@ -23,7 +23,8 @@ async def search_web(state: State, config: RunnableConfig) -> State:
     # Get the query from the first message
     if state.messages:
         query = state.messages[0].content
-        results = await search(query, config=config, state=state)
+        # Change this line to use combined_search instead of search
+        results = await combined_search(query, config=config, state=state)
         
         # Store results in state
         if results:

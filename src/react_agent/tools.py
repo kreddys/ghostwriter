@@ -1,4 +1,5 @@
 """This module provides example tools for web scraping and search functionality."""
+import os
 from typing import Annotated, Any, Optional, Dict, List
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
@@ -15,7 +16,7 @@ async def google_search(
     """Search the web using Google Custom Search API."""
     try:
         configuration = Configuration.from_runnable_config(config)
-
+        
         # Get API keys from environment variables
         google_api_key = os.getenv("GOOGLE_API_KEY")
         google_cse_id = os.getenv("GOOGLE_CSE_ID")        
@@ -24,12 +25,12 @@ async def google_search(
             raise ValueError("Google API key or CSE ID not found in environment variables")
         
         # Initialize Google Custom Search API client
-        service = build("customsearch", "v1", developerKey=configuration.google_api_key)
+        service = build("customsearch", "v1", developerKey=google_api_key)
         
         # Perform the search
         result = service.cse().list(
             q=query,
-            cx=configuration.google_cse_id,  # Custom Search Engine ID
+            cx=google_cse_id,  # Use environment variable
             num=configuration.max_search_results
         ).execute()
         
