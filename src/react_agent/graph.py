@@ -86,8 +86,12 @@ def route_model_output(state: State) -> Literal["__end__", "tools"]:
     
     # Check for redundant search queries
     for tool_call in last_message.tool_calls:
-        if tool_call.name == "search":
-            query = tool_call.args.get("query", "")
+        # Access tool call properties from the dictionary structure
+        if (isinstance(tool_call, dict) and 
+            tool_call.get("type") == "function" and 
+            tool_call.get("function", {}).get("name") == "search"):
+            
+            query = tool_call.get("function", {}).get("arguments", {}).get("query", "")
             normalized_query = normalize_date_query(query)
             
             # If we've already searched something similar, end the conversation
