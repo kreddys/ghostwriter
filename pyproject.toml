@@ -18,6 +18,7 @@ dependencies = [
     "langchain-community>=0.3.14",
     "tavily-python>=0.4.0",
     "langchain-ollama>=0.1.0",
+    "google-api-python-client>=2.0.0",
 ]
 
 

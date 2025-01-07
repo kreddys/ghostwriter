@@ -3,8 +3,54 @@ from typing import Annotated, Any, Optional, Dict, List
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
 from tavily import TavilyClient, InvalidAPIKeyError, MissingAPIKeyError, UsageLimitExceededError
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from .configuration import Configuration
 from .state import State
+
+async def google_search(
+    query: str, *, config: Annotated[RunnableConfig, InjectedToolArg],
+    state: State
+) -> Optional[List[Dict[str, Any]]]:
+    """Search the web using Google Custom Search API."""
+    try:
+        configuration = Configuration.from_runnable_config(config)
+        
+        # Initialize Google Custom Search API client
+        service = build("customsearch", "v1", developerKey=configuration.google_api_key)
+        
+        # Perform the search
+        result = service.cse().list(
+            q=query,
+            cx=configuration.google_cse_id,  # Custom Search Engine ID
+            num=configuration.max_search_results
+        ).execute()
+        
+        processed_results = []
+        
+        # Process search results
+        if 'items' in result:
+            for item in result['items']:
+                processed_results.append({
+                    "type": "text",
+                    "title": item.get('title', 'N/A'),
+                    "url": item.get('link', 'N/A'),
+                    "content": item.get('snippet', 'N/A'),
+                    "source": "google"
+                })
+        
+        # Store results in state
+        state.previous_searches.add(query)
+        if query not in state.search_results:
+            state.search_results[query] = []
+        state.search_results[query].extend(processed_results)
+        
+        return processed_results
+        
+    except HttpError as e:
+        raise ValueError(f"Google Search API error: {str(e)}")
+    except Exception as e:
+        raise ValueError(f"Error performing Google search: {str(e)}")
 
 async def search(
     query: str, *, config: Annotated[RunnableConfig, InjectedToolArg], 
@@ -70,3 +116,30 @@ async def search(
         raise ValueError("Tavily API usage limit exceeded. Please check your plan limits.")
     except Exception as e:
         raise ValueError(f"Error performing Tavily search: {str(e)}")
+
+async def combined_search(
+    query: str, *, config: Annotated[RunnableConfig, InjectedToolArg],
+    state: State
+) -> Optional[List[Dict[str, Any]]]:
+    """Perform both Tavily and Google searches and combine results."""
+    try:
+        # Get results from both search engines
+        tavily_results = await search(query, config=config, state=state)
+        google_results = await google_search(query, config=config, state=state)
+        
+        combined_results = []
+        
+        # Add Tavily results if available
+        if tavily_results:
+            for result in tavily_results:
+                result['source'] = 'tavily'
+                combined_results.append(result)
+                
+        # Add Google results if available
+        if google_results:
+            combined_results.extend(google_results)
+            
+        return combined_results
+        
+    except Exception as e:
+        raise ValueError(f"Error performing combined search: {str(e)}")
