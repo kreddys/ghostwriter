@@ -1,0 +1,9 @@
+version: '3.9'
+
+services:
+  my_service:
+    image: langchain/langgraph-api:3.11
+    volumes:
+      - ./logs:/app/logs # Bind mount for logs directory
+
+volumes: {} # This is optional unless you're defining named volumes

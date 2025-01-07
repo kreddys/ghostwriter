@@ -1,5 +1,8 @@
 {
-  "dockerfile_lines": [],
+  "dockerfile_lines": [
+    "RUN mkdir -p /app/logs && chmod 777 /app/logs"
+  ],
+  "docker_compose_file": "docker-compose.yml",
   "graphs": {
     "agent": "./src/react_agent/graph.py:graph"
   },
