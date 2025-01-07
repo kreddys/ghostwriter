@@ -1,12 +1,9 @@
-"""Define a custom Reasoning and Action agent.
-
-Works with a chat model with tool calling support.
-"""
+"""Define a custom Reasoning and Action agent."""
 import os
+from typing import Any, Dict, List, Literal
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, cast
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph
 from langgraph.prebuilt import ToolNode
@@ -15,95 +12,86 @@ from langchain_openai import ChatOpenAI
 
 from react_agent.configuration import Configuration
 from react_agent.state import InputState, State
-from react_agent.tools import TOOLS
+from react_agent.tools import search
 
+async def search_web(state: State, config: RunnableConfig) -> State:
+    """First step: Search the web for articles."""
+    # Initialize search results dictionary if not exists
+    if not hasattr(state, 'search_results'):
+        state.search_results = {}
+    
+    # Get the query from the first message
+    if state.messages:
+        query = state.messages[0].content
+        results = await search(query, config=config, state=state)
+        
+        # Store results in state
+        if results:
+            normalized_query = query.lower()
+            state.search_results[normalized_query] = results
+    
+    return state
 
-async def call_model(state: State, config: RunnableConfig) -> Dict[str, List[AIMessage]]:
-    """Call the LLM powering our "agent"."""
+async def generate_article(state: State, config: RunnableConfig) -> Dict[str, List[AIMessage]]:
+    """Second step: Generate consolidated article from search results."""
     configuration = Configuration.from_runnable_config(config)
-
+    
     if configuration.model.startswith("deepseek/"):
-        # Initialize DeepSeek model using OpenAI-compatible interface
         model = ChatOpenAI(
-            model="deepseek-chat",  # DeepSeek's model name
+            model="deepseek-chat",
             openai_api_key=os.getenv("DEEPSEEK_API_KEY"),
-            openai_api_base="https://api.deepseek.com/v1",  # DeepSeek's API endpoint
+            openai_api_base="https://api.deepseek.com/v1",
             temperature=0.8,
             max_tokens=4096,
-        ).bind_tools(TOOLS)
+        )
     else:
-        # Existing Ollama model initialization
         model = ChatOllama(
             model=configuration.model.split('/')[1],
             base_url="http://host.docker.internal:11434",
             temperature=0.8,
             num_ctx=8192,
             num_predict=4096,
-        ).bind_tools(TOOLS)
+        )
 
-    # Rest of the function remains the same
-    system_message = configuration.system_prompt.format(
-        system_time=datetime.now(tz=timezone.utc).isoformat()
-    )
+    # Get all search results
+    all_results = []
+    for results in state.search_results.values():
+        if isinstance(results, list):
+            all_results.extend(results)
 
-    response = cast(
-        AIMessage,
-        await model.ainvoke(
-            [{"role": "system", "content": system_message}, *state.messages], config
-        ),
-    )
+    # Create prompt with search results
+    search_results_text = "\n\n".join([
+        f"Title: {result.get('title', 'N/A')}\nContent: {result.get('content', 'N/A')}"
+        for result in all_results
+    ])
 
-    if state.is_last_step and response.tool_calls:
-        return {
-            "messages": [
-                AIMessage(
-                    id=response.id,
-                    content="Sorry, I could not find an answer to your question in the specified number of steps.",
-                )
-            ]
-        }
+    messages = [
+        SystemMessage(content="You are a skilled writer. Using the provided search results, "
+                            "create a well-organized, comprehensive article that synthesizes "
+                            "the information. Use a professional tone and ensure the article "
+                            "flows naturally."),
+        HumanMessage(content=f"Here are the search results:\n\n{search_results_text}\n\n"
+                            f"Please create a consolidated article based on these results.")
+    ]
 
+    response = await model.ainvoke(messages)
     return {"messages": [response]}
 
-
-# Define the graph
-builder = StateGraph(State, input=InputState, config_schema=Configuration)
-
-# Define nodes
-builder.add_node(call_model)
-builder.add_node("tools", ToolNode(TOOLS))
-
-# Set the entrypoint
-builder.add_edge("__start__", "call_model")
-
-
-def route_model_output(state: State) -> Literal["__end__", "tools"]:
-    last_message = state.messages[-1]
+def create_graph() -> StateGraph:
+    """Create the graph with two simple steps: search and generate."""
+    # Initialize with both State and InputState
+    workflow = StateGraph(State, input=InputState)
     
-    # If there are no tool calls, end the conversation
-    if not last_message.tool_calls:
-        return "__end__"
+    # Add the nodes
+    workflow.add_node("search", search_web)
+    workflow.add_node("generate", generate_article)
     
-    # Check for redundant search queries
-    for tool_call in last_message.tool_calls:
-        # Access tool call properties from the dictionary structure
-        if (isinstance(tool_call, dict) and 
-            tool_call.get("type") == "function" and 
-            tool_call.get("function", {}).get("name") == "search"):
-            
-            query = tool_call.get("function", {}).get("arguments", {}).get("query", "")
-            normalized_query = normalize_date_query(query)
-            
-            # If we've already searched something similar, end the conversation
-            if normalized_query in state.previous_searches:
-                return "__end__"
+    # Add the edges
+    workflow.set_entry_point("search")
+    workflow.add_edge("search", "generate")
+    workflow.set_finish_point("generate")
     
-    return "tools"
+    return workflow.compile()
 
-
-# Add edges for routing
-builder.add_conditional_edges("call_model", route_model_output)
-builder.add_edge("tools", "call_model")
-
-# Compile the graph
-graph = builder.compile()
+# Create the graph instance
+graph = create_graph()
