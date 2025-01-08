@@ -51,6 +51,21 @@ class Configuration:
             "description": "Number of days to look back for search results"
         }
     )
+
+    slack_enabled: bool = field(
+        default=True,
+        metadata={
+            "description": "Whether to enable Slack integration"
+        }
+    )
+    
+    slack_format_code_blocks: bool = field(
+        default=True,
+        metadata={
+            "description": "Whether to format articles as code blocks in Slack"
+        }
+    )
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None
