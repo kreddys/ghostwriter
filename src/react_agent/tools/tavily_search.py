@@ -22,18 +22,22 @@ async def tavily_search(
         logger.debug("Initializing Tavily client")
         tavily_client = TavilyClient()
 
-        # Modify the query to be more specific
-        specific_query = f"{query} location:\"Amaravati, Andhra Pradesh\" site:news"
+        search_query = query
+        # Add site restrictions if sites_list is configured
+        if hasattr(configuration, 'sites_list') and configuration.sites_list:
+            site_filter = " OR ".join(f"site:{site}" for site in configuration.sites_list)
+            search_query = f"({query}) ({site_filter})"
         
-        logger.info(f"Executing Tavily search with max results: {configuration.max_search_results}")
+        logger.info(f"Executing Tavily search with max results: {configuration.max_search_results} & search params: {search_query} & with in days {configuration.search_days}")
+
         response = tavily_client.search(
-            query=specific_query,
+            query=search_query,
             search_depth="advanced",
             max_results=configuration.max_search_results,
             include_answer=True,
             include_raw_content=True,
             include_images=True,
-            topic="news",
+            topic="general",
             days=configuration.search_days
         )
         

@@ -37,7 +37,14 @@ class Configuration:
             "description": "The maximum number of search results to return for each search query."
         },
     )
-    
+
+    sites_list: Optional[list[str]] = field(
+        default=None,
+        metadata={
+            "description": "List of websites to search. If None, searches the entire web"
+        }
+    )
+       
     search_days: int = field(
         default=7,
         metadata={

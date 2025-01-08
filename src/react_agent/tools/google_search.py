@@ -32,24 +32,23 @@ async def google_search(
         logger.debug("Building Google Custom Search service")
         service = build("customsearch", "v1", developerKey=google_api_key)
 
-        # Modify the query to be more specific
-        specific_query = f"{query} site:(thehindu.com OR deccanchronicle.com OR indianexpress.com) Amaravati Andhra Pradesh"
+        search_params = {
+            "q": query,
+            "cx": google_cse_id,
+            "num": configuration.max_search_results,
+            "dateRestrict": f"d{configuration.search_days}",
+        }
+        
+        # Add site restrictions if sites_list is configured
+        if hasattr(configuration, 'sites_list') and configuration.sites_list:
+            site_filter = " OR ".join(f"site:{site}" for site in configuration.sites_list)
+            search_params["q"] = f"({query}) ({site_filter})"
+            search_params["siteSearch"] = ",".join(configuration.sites_list)
+            search_params["siteSearchFilter"] = "i"
 
+        logger.info(f"Executing Google search with max results: {configuration.max_search_results} & search params {search_params}")
 
-        # Add date restriction based on configuration
-        date_restrict = f"d{configuration.search_days}"
-
-        logger.info(f"Executing Google search with max results: {configuration.max_search_results}")
-        result = service.cse().list(
-            q=specific_query,
-            cx=google_cse_id,
-            num=configuration.max_search_results,
-            dateRestrict=date_restrict,
-            sort='date',
-            # Add site restriction to news sites
-            siteSearch="news.google.com,thehindu.com,deccanchronicle.com,indianexpress.com",
-            siteSearchFilter="i"  # Include only these sites
-        ).execute()
+        result = service.cse().list(**search_params).execute()
         
         logger.debug(f"Raw Google API response: {result}")
         processed_results = []
