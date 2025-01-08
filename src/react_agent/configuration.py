@@ -37,7 +37,13 @@ class Configuration:
             "description": "The maximum number of search results to return for each search query."
         },
     )
-
+    
+    search_days: int = field(
+        default=7,
+        metadata={
+            "description": "Number of days to look back for search results"
+        }
+    )
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None

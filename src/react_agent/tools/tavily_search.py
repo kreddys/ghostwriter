@@ -30,8 +30,8 @@ async def tavily_search(
             include_answer=True,
             include_raw_content=True,
             include_images=True,
-            topic="general",
-            days=1
+            topic="news",
+            days=configuration.search_days
         )
         
         logger.debug(f"Raw Tavily API response: {response}")
