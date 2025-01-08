@@ -6,12 +6,11 @@ It invokes tools in a simple loop.
 
 import logging
 
-# Configure logging for console output only
+# Configure logging for detailed console output
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        # Console handler only
         logging.StreamHandler()
     ]
 )

@@ -25,6 +25,7 @@ async def combined_search(
         logger.debug("Executing Google search")
         google_results = await google_search(query, config=config, state=state)
         logger.info(f"Google search returned {len(google_results) if google_results else 0} results")
+        logger.info(google_results)
         
         combined_results = []
         
