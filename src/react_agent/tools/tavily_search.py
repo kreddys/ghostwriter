@@ -37,22 +37,7 @@ async def tavily_search(
         logger.debug(f"Raw Tavily API response: {response}")
         processed_results = []
         
-        if response.get("answer"):
-            logger.debug("Found Tavily answer response")
-            processed_results.append({
-                "type": "answer",
-                "content": response["answer"],
-                "source": "tavily"
-            })
-        
-        if response.get("images"):
-            logger.debug(f"Found {len(response['images'])} images in Tavily response")
-            processed_results.append({
-                "type": "images",
-                "content": response["images"],
-                "source": "tavily"
-            })
-        
+        # Process results to match Google format
         if response.get("results"):
             logger.info(f"Found {len(response['results'])} results from Tavily search")
             for item in response["results"]:
@@ -61,7 +46,6 @@ async def tavily_search(
                     "title": item.get("title", "N/A"),
                     "url": item.get("url", "N/A"),
                     "content": item.get("content", "N/A"),
-                    "score": item.get("score", 0.0),
                     "source": "tavily"
                 })
         

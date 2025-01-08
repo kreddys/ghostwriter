@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 
 from react_agent.configuration import Configuration
 from react_agent.state import InputState, State
-from react_agent.tools import combined_search
+from react_agent.tools.combined_search import combined_search
 
 logger = logging.getLogger(__name__)
 
