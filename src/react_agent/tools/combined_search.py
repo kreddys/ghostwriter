@@ -22,12 +22,27 @@ async def combined_search(
     google_results = await google_search(query, config=config, state=state)
     tavily_results = await tavily_search(query, config=config, state=state)
     
-    # Combine results
+    # Filter function to check if result is about Amaravati
+    def is_relevant_to_amaravati(result):
+        text = (
+            (result.get('title', '') + ' ' + result.get('content', '')).lower()
+        )
+        return 'amaravati' in text and 'andhra pradesh' in text
+    
+    # Filter and combine results
     combined_results = []
     if google_results:
-        combined_results.extend(google_results)
+        filtered_google = [r for r in google_results if is_relevant_to_amaravati(r)]
+        combined_results.extend(filtered_google)
     if tavily_results:
-        combined_results.extend(tavily_results)
+        filtered_tavily = [r for r in tavily_results if is_relevant_to_amaravati(r)]
+        combined_results.extend(filtered_tavily)
     
-    logger.info(f"Combined search completed with {len(combined_results)} total results")
+    # Sort by date if available
+    combined_results.sort(
+        key=lambda x: x.get('published_date', ''), 
+        reverse=True
+    )
+    
+    logger.info(f"Combined search completed with {len(combined_results)} relevant results")
     return combined_results

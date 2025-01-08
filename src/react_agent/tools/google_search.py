@@ -32,16 +32,23 @@ async def google_search(
         logger.debug("Building Google Custom Search service")
         service = build("customsearch", "v1", developerKey=google_api_key)
 
+        # Modify the query to be more specific
+        specific_query = f"{query} site:(thehindu.com OR deccanchronicle.com OR indianexpress.com) Amaravati Andhra Pradesh"
+
+
         # Add date restriction based on configuration
         date_restrict = f"d{configuration.search_days}"
 
         logger.info(f"Executing Google search with max results: {configuration.max_search_results}")
         result = service.cse().list(
-            q=query,
+            q=specific_query,
             cx=google_cse_id,
             num=configuration.max_search_results,
-            dateRestrict=date_restrict,  # Add date restriction
-            sort='date'  # Sort by date
+            dateRestrict=date_restrict,
+            sort='date',
+            # Add site restriction to news sites
+            siteSearch="news.google.com,thehindu.com,deccanchronicle.com,indianexpress.com",
+            siteSearchFilter="i"  # Include only these sites
         ).execute()
         
         logger.debug(f"Raw Google API response: {result}")

@@ -21,10 +21,13 @@ async def tavily_search(
         configuration = Configuration.from_runnable_config(config)
         logger.debug("Initializing Tavily client")
         tavily_client = TavilyClient()
+
+        # Modify the query to be more specific
+        specific_query = f"{query} location:\"Amaravati, Andhra Pradesh\" site:news"
         
         logger.info(f"Executing Tavily search with max results: {configuration.max_search_results}")
         response = tavily_client.search(
-            query=query,
+            query=specific_query,
             search_depth="advanced",
             max_results=configuration.max_search_results,
             include_answer=True,
