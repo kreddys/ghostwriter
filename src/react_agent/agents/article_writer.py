@@ -1,4 +1,6 @@
 """Article Writer Agent functionality."""
+
+
 import os
 import logging
 from typing import Dict, List
@@ -12,25 +14,26 @@ from ..configuration import Configuration
 
 logger = logging.getLogger(__name__)
 
+
 async def article_writer_agent(
     state: State,
     config: RunnableConfig,
 ) -> State:  # Changed return type to State
     """
     Agent that processes search results and generates articles in Ghost-compatible format.
-    
+
     Args:
         state: Current state containing search results and messages
         config: Configuration for the agent
-    
+
     Returns:
         Updated state containing generated articles
     """
     logger.info("Starting Article Writer Agent")
-    
+
     configuration = Configuration.from_runnable_config(config)
     logger.info(f"Using model: {configuration.model}")
-    
+
     # Initialize the appropriate model
     if configuration.model.startswith("deepseek/"):
         logger.info("Initializing DeepSeek model")
@@ -44,7 +47,7 @@ async def article_writer_agent(
     else:
         logger.info("Initializing Ollama model")
         model = ChatOllama(
-            model=configuration.model.split('/')[1],
+            model=configuration.model.split("/")[1],
             base_url="http://host.docker.internal:11434",
             temperature=0.8,
             num_ctx=8192,
@@ -59,30 +62,45 @@ async def article_writer_agent(
     logger.info(f"Processing {len(all_results)} total search results")
 
     # Create prompt with search results
-    search_results_text = "\n\n".join([
-        f"Title: {result.get('title', 'N/A')}\nContent: {result.get('content', 'N/A')}"
-        for result in all_results
-    ])
+    search_results_text = "\n\n".join(
+        [
+            f"Title: {result.get('title', 'N/A')}\nContent: {result.get('content', 'N/A')}"
+            for result in all_results
+        ]
+    )
 
     messages = [
-        SystemMessage(content="""You are a skilled writer and content organizer. Using the provided search results, create Ghost-compatible articles:
-        1. Identify distinct topics or themes in the search results
-        2. Create multiple articles, one for each major topic
-        3. Each article should follow this Ghost-compatible format:
-           [ARTICLE_START]
-           ---
-           title: <article title>
-           description: <meta description - compelling summary in 150-160 characters>
-           feature_image: <relevant image URL if available>
-           tags: [tag1, tag2, tag3]
-           published: true
-           ---
-           
-           <article content in markdown format>
-           [ARTICLE_END]
-           
-        Separate multiple articles with '==='"""),
-        HumanMessage(content=f"Generate articles from these search results:\n\n{search_results_text}")
+        SystemMessage(
+            content="""You are a skilled writer and content organizer. Using the provided search results, create articles in clean markdown format:
+                1. Identify distinct topics or themes in the search results
+                2. Create multiple articles, one for each major topic
+                3. Each article should follow this format:
+
+                [ARTICLE_START]
+                # <article title>
+
+                <meta description - compelling summary in 150-160 characters>
+
+                ## Tags
+                - tag1
+                - tag2
+                - tag3
+
+                ## Content
+                <article content in pure markdown format - use proper headings, lists, code blocks, etc.>
+                [ARTICLE_END]
+
+                Separate multiple articles with '==='
+
+                Important:
+                - Use proper markdown syntax (##, -, *, `, etc.)
+                - Do not include any non-markdown formatting
+                - Do not include Ghost-specific frontmatter
+                """
+            ),
+        HumanMessage(
+            content=f"Generate articles from these search results:\n\n{search_results_text}"
+        ),
     ]
 
     # Generate response using the model
@@ -90,10 +108,11 @@ async def article_writer_agent(
     formatted_response = response.content
 
     # Store the generated articles in state
-    if not hasattr(state, 'articles'):
+    if not hasattr(state, "articles"):
         state.articles = {}
-    
+
     state.articles["messages"] = [AIMessage(content=formatted_response)]
     logger.info(f"Generated and stored articles in state")
 
     return state
+
