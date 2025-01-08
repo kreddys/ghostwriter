@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 async def article_writer_agent(
     state: State,
     config: RunnableConfig,
-) -> Dict[str, List[AIMessage]]:
+) -> State:  # Changed return type to State
     """
     Agent that processes search results and generates articles in Ghost-compatible format.
     
@@ -24,7 +24,7 @@ async def article_writer_agent(
         config: Configuration for the agent
     
     Returns:
-        Dictionary containing generated articles as AIMessages
+        Updated state containing generated articles
     """
     logger.info("Starting Article Writer Agent")
     
@@ -77,64 +77,23 @@ async def article_writer_agent(
            tags: [tag1, tag2, tag3]
            published: true
            ---
-
-           # <article title>
-
-           <meta description>
-
-           ## Introduction
-           <introduction content>
-
-           ## <section heading>
-           <section content>
-
-           ## Conclusion
-           <conclusion content>
+           
+           <article content in markdown format>
            [ARTICLE_END]
-        
-        Use proper Markdown formatting:
-        - Use # for main title
-        - Use ## for section headings
-        - Use proper paragraph spacing with blank lines between paragraphs
-        - Format links as [text](url)
-        - Use * or _ for emphasis
-        - Use proper list formatting with - or numbers
-        - Include relevant quotes using > for blockquotes
-        
-        Ensure each article:
-        - Has a compelling title and meta description
-        - Is well-structured with clear sections
-        - Includes relevant internal and external links
-        - Uses appropriate tags for categorization
-        - Maintains a professional tone
-        - Synthesizes information from multiple sources
-        - Provides valuable insights to readers"""),
-        HumanMessage(content=f"Here are the search results:\n\n{search_results_text}\n\n"
-                            f"Please create multiple Ghost-compatible articles, organizing the information by topic.")
+           
+        Separate multiple articles with '==='"""),
+        HumanMessage(content=f"Generate articles from these search results:\n\n{search_results_text}")
     ]
 
-    logger.info("Sending request to language model")
+    # Generate response using the model
     response = await model.ainvoke(messages)
-    logger.info("Received response from language model")
+    formatted_response = response.content
+
+    # Store the generated articles in state
+    if not hasattr(state, 'articles'):
+        state.articles = {}
     
-    # Process the response
-    content = response.content
-    articles = []
-    
-    # Split the content into individual articles
-    raw_articles = content.split("[ARTICLE_START]")
-    for article in raw_articles:
-        if article.strip():
-            article = article.split("[ARTICLE_END]")[0].strip()
-            # Verify it has the required Ghost format elements
-            if "---" in article and "title:" in article:
-                articles.append(article)
-    
-    logger.info(f"Generated {len(articles)} articles")
-    
-    # Create formatted response - keeping articles separated but maintaining Ghost format
-    formatted_response = "Multiple Ghost-compatible articles generated:\n\n"
-    formatted_response += "\n\n===\n\n".join(articles)
-    
-    logger.info("Article Writer Agent completed successfully")
-    return {"messages": [AIMessage(content=formatted_response)]}
+    state.articles["messages"] = [AIMessage(content=formatted_response)]
+    logger.info(f"Generated and stored articles in state")
+
+    return state

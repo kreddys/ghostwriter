@@ -39,10 +39,12 @@ async def publish_to_slack(state: State, config: RunnableConfig) -> State:
     logger.info("Starting Slack publication process")
     
     try:
-        # Get articles from the state (assuming they were added by article_writer_agent)
-        if hasattr(state, 'articles'):
+        if hasattr(state, 'articles') and state.articles:
+            logger.info(f"Found {len(state.articles.get('messages', []))} articles to publish")
             await slack_sender(state.articles, config=config, state=state)
             logger.info("Successfully published articles to Slack")
+        else:
+            logger.warning("No articles found in state to publish")
     except Exception as e:
         logger.error(f"Error publishing to Slack: {str(e)}")
         # Continue execution even if Slack publishing fails

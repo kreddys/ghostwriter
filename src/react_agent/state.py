@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
-from langchain_core.messages import AnyMessage
+from langchain_core.messages import AnyMessage, AIMessage
 from langgraph.graph import add_messages
 from langgraph.managed import IsLastStep
 from typing_extensions import Annotated
@@ -61,3 +61,4 @@ class State(InputState):
     # Add new fields to track searches
     previous_searches: set[str] = field(default_factory=set)
     search_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    articles: dict[str, list[AIMessage]] = field(default_factory=dict) 

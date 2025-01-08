@@ -19,17 +19,7 @@ async def slack_sender(
     config: Annotated[RunnableConfig, InjectedToolArg],
     state: State
 ) -> bool:
-    """
-    Send articles to a Slack channel.
-    
-    Args:
-        articles: Dictionary containing articles as AIMessages
-        config: Configuration for the tool
-        state: Current state
-    
-    Returns:
-        bool: True if successful, False otherwise
-    """
+    """Send articles to a Slack channel."""
     logger.info("Starting Slack Sender")
     
     try:
@@ -38,27 +28,31 @@ async def slack_sender(
         slack_channel = os.getenv("SLACK_CHANNEL_ID")
         
         if not slack_token or not slack_channel:
-            logger.error("Missing Slack credentials")
-            raise ValueError("Slack token or channel ID not found in environment variables")
+            logger.error("Missing Slack credentials - SLACK_BOT_TOKEN or SLACK_CHANNEL_ID not found")
+            return False
         
+        logger.info(f"Initializing Slack client for channel {slack_channel}")
         client = WebClient(token=slack_token)
         
+        # Log the number of articles being processed
+        messages = articles.get("messages", [])
+        logger.info(f"Processing {len(messages)} messages for Slack")
+        
         # Process and send each article
-        for message in articles.get("messages", []):
+        for i, message in enumerate(messages, 1):
             content = message.content
-            
-            # Split content into individual articles
             article_sections = content.split("===")
             
-            for article in article_sections:
+            logger.info(f"Processing message {i} with {len(article_sections)} sections")
+            
+            for j, article in enumerate(article_sections, 1):
                 if not article.strip():
                     continue
                 
                 try:
-                    # Format the message for Slack
                     formatted_message = f"```\n{article.strip()}\n```"
+                    logger.info(f"Sending article {j} to Slack channel {slack_channel}")
                     
-                    # Send message to Slack
                     response = client.chat_postMessage(
                         channel=slack_channel,
                         text=formatted_message,
@@ -66,16 +60,16 @@ async def slack_sender(
                     )
                     
                     if response["ok"]:
-                        logger.info(f"Successfully sent article to Slack channel {slack_channel}")
+                        logger.info(f"Successfully sent article {j} to Slack")
                     else:
-                        logger.error(f"Failed to send article to Slack: {response}")
+                        logger.error(f"Failed to send article {j} to Slack: {response}")
                         
                 except SlackApiError as e:
-                    logger.error(f"Error sending message to Slack: {str(e)}")
+                    logger.error(f"Slack API Error for article {j}: {str(e)}")
                     continue
         
         return True
         
     except Exception as e:
         logger.error(f"Unexpected error in Slack sender: {str(e)}", exc_info=True)
-        raise ValueError(f"Error sending articles to Slack: {str(e)}")
+        return False
