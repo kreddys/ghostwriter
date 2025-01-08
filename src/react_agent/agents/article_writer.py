@@ -17,7 +17,7 @@ async def article_writer_agent(
     config: RunnableConfig,
 ) -> Dict[str, List[AIMessage]]:
     """
-    Agent that processes search results and generates articles based on the input.
+    Agent that processes search results and generates articles in Ghost-compatible format.
     
     Args:
         state: Current state containing search results and messages
@@ -65,21 +65,52 @@ async def article_writer_agent(
     ])
 
     messages = [
-        SystemMessage(content="""You are a skilled writer and content organizer. Using the provided search results:
+        SystemMessage(content="""You are a skilled writer and content organizer. Using the provided search results, create Ghost-compatible articles:
         1. Identify distinct topics or themes in the search results
         2. Create multiple articles, one for each major topic
-        3. Each article should have:
-           - A clear, descriptive title
-           - Well-organized content that synthesizes information from relevant search results
-        4. Format each article as:
+        3. Each article should follow this Ghost-compatible format:
            [ARTICLE_START]
-           Title: <article title>
-           Content: <article content>
+           ---
+           title: <article title>
+           description: <meta description - compelling summary in 150-160 characters>
+           feature_image: <relevant image URL if available>
+           tags: [tag1, tag2, tag3]
+           published: true
+           ---
+
+           # <article title>
+
+           <meta description>
+
+           ## Introduction
+           <introduction content>
+
+           ## <section heading>
+           <section content>
+
+           ## Conclusion
+           <conclusion content>
            [ARTICLE_END]
         
-        Use a professional tone and ensure each article flows naturally."""),
+        Use proper Markdown formatting:
+        - Use # for main title
+        - Use ## for section headings
+        - Use proper paragraph spacing with blank lines between paragraphs
+        - Format links as [text](url)
+        - Use * or _ for emphasis
+        - Use proper list formatting with - or numbers
+        - Include relevant quotes using > for blockquotes
+        
+        Ensure each article:
+        - Has a compelling title and meta description
+        - Is well-structured with clear sections
+        - Includes relevant internal and external links
+        - Uses appropriate tags for categorization
+        - Maintains a professional tone
+        - Synthesizes information from multiple sources
+        - Provides valuable insights to readers"""),
         HumanMessage(content=f"Here are the search results:\n\n{search_results_text}\n\n"
-                            f"Please create multiple articles, organizing the information by topic.")
+                            f"Please create multiple Ghost-compatible articles, organizing the information by topic.")
     ]
 
     logger.info("Sending request to language model")
@@ -95,14 +126,15 @@ async def article_writer_agent(
     for article in raw_articles:
         if article.strip():
             article = article.split("[ARTICLE_END]")[0].strip()
-            if "Title:" in article and "Content:" in article:
+            # Verify it has the required Ghost format elements
+            if "---" in article and "title:" in article:
                 articles.append(article)
     
     logger.info(f"Generated {len(articles)} articles")
     
-    # Create formatted response
-    formatted_response = "Multiple articles generated from the search results:\n\n"
-    formatted_response += "\n\n---\n\n".join(articles)
+    # Create formatted response - keeping articles separated but maintaining Ghost format
+    formatted_response = "Multiple Ghost-compatible articles generated:\n\n"
+    formatted_response += "\n\n===\n\n".join(articles)
     
     logger.info("Article Writer Agent completed successfully")
     return {"messages": [AIMessage(content=formatted_response)]}
