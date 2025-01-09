@@ -9,7 +9,6 @@ from langchain_core.messages import AIMessage
 import os
 
 from ..state import State
-from ..configuration import Configuration
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ async def slack_sender(
     config: Annotated[RunnableConfig, InjectedToolArg],
     state: State
 ) -> bool:
-    """Send articles to a Slack channel."""
+    """Send articles to a Slack channel with approve/reject buttons."""
     logger.info("Starting Slack Sender")
     
     try:
@@ -42,42 +41,73 @@ async def slack_sender(
             remaining_text = content
             
             while "[ARTICLE_START]" in remaining_text and "[ARTICLE_END]" in remaining_text:
-                # Find start and end of current article
                 start_idx = remaining_text.find("[ARTICLE_START]")
                 end_idx = remaining_text.find("[ARTICLE_END]") + len("[ARTICLE_END]")
                 
                 if start_idx != -1 and end_idx != -1:
-                    # Extract article
                     article = remaining_text[start_idx:end_idx]
                     article = article.replace("[ARTICLE_START]", "").replace("[ARTICLE_END]", "").strip()
                     article_parts.append(article)
-                    
-                    # Update remaining text
                     remaining_text = remaining_text[end_idx:].strip()
                 else:
                     break
             
-            # Send each article as a separate message
-            for article in article_parts:
+            # Send each article as a separate message with buttons
+            for idx, article in enumerate(article_parts):
                 if article.strip():
                     formatted_article = f"```\n{article}\n```"
-                    logger.info("Sending article to Slack")
+                    
+                    # Create blocks for message with buttons
+                    blocks = [
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": formatted_article
+                            }
+                        },
+                        {
+                            "type": "actions",
+                            "elements": [
+                                {
+                                    "type": "button",
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Approve"
+                                    },
+                                    "style": "primary",
+                                    "action_id": f"approve_article_{idx}",
+                                    "value": article  # Store article content in button value
+                                },
+                                {
+                                    "type": "button",
+                                    "text": {
+                                        "type": "plain_text",
+                                        "text": "Reject"
+                                    },
+                                    "style": "danger",
+                                    "action_id": f"reject_article_{idx}"
+                                }
+                            ]
+                        }
+                    ]
+                    
+                    logger.info(f"Sending article {idx + 1} to Slack")
                     response = client.chat_postMessage(
                         channel=slack_channel,
-                        text=formatted_article,
-                        parse="full"
+                        blocks=blocks,
+                        text=formatted_article  # Fallback text
                     )
                     if not response["ok"]:
                         logger.error(f"Failed to send article to Slack: {response}")
             
-            # Send remaining text (reasoning/other content) as a separate message
+            # Send remaining text as a separate message
             if remaining_text.strip():
                 formatted_remaining = f"```\n{remaining_text}\n```"
                 logger.info("Sending remaining content to Slack")
                 response = client.chat_postMessage(
                     channel=slack_channel,
-                    text=formatted_remaining,
-                    parse="full"
+                    text=formatted_remaining
                 )
                 if not response["ok"]:
                     logger.error(f"Failed to send remaining content to Slack: {response}")
