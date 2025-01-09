@@ -116,5 +116,5 @@ async def fetch_ghost_articles(app_url: str, api_key: str) -> List[GhostArticle]
             except Exception as e:
                 logger.error(f"Error fetching articles: {e}")
                 break
-    
+    logger.info(f"Fetched {len(all_articles)} articles from Ghost CMS")
     return all_articles

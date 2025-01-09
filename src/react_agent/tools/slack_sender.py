@@ -28,53 +28,65 @@ async def slack_sender(
         slack_channel = os.getenv("SLACK_CHANNEL_ID")
         
         if not slack_token or not slack_channel:
-            logger.error("Missing Slack credentials - SLACK_BOT_TOKEN or SLACK_CHANNEL_ID not found")
+            logger.error("Missing Slack credentials")
             return False
         
-        logger.info(f"Initializing Slack client for channel {slack_channel}")
         client = WebClient(token=slack_token)
-        
-        # Log the number of articles being processed
         messages = articles.get("messages", [])
-        logger.info(f"Processing {len(messages)} messages for Slack")
         
-        # Process and send each article
-        for i, message in enumerate(messages, 1):
+        for message in messages:
             content = message.content
-            article_sections = content.split("===")
             
-            logger.info(f"Processing message {i} with {len(article_sections)} sections")
+            # Split content into individual articles and remaining text
+            article_parts = []
+            remaining_text = content
             
-            for j, article in enumerate(article_sections, 1):
-                if not article.strip():
-                    continue
+            while "[ARTICLE_START]" in remaining_text and "[ARTICLE_END]" in remaining_text:
+                # Find start and end of current article
+                start_idx = remaining_text.find("[ARTICLE_START]")
+                end_idx = remaining_text.find("[ARTICLE_END]") + len("[ARTICLE_END]")
                 
-                try:
-                    # Clean up the article content by removing any remaining tags
-                    cleaned_article = article.strip()
-                    cleaned_article = cleaned_article.replace("[ARTICLE_START]", "").replace("[ARTICLE_END]", "")
-                    cleaned_article = cleaned_article.strip()
-
-                    formatted_message = f"```\n{cleaned_article.strip()}\n```"
-                    logger.info(f"Sending article {j} to Slack channel {slack_channel}")
+                if start_idx != -1 and end_idx != -1:
+                    # Extract article
+                    article = remaining_text[start_idx:end_idx]
+                    article = article.replace("[ARTICLE_START]", "").replace("[ARTICLE_END]", "").strip()
+                    article_parts.append(article)
                     
+                    # Update remaining text
+                    remaining_text = remaining_text[end_idx:].strip()
+                else:
+                    break
+            
+            # Send each article as a separate message
+            for article in article_parts:
+                if article.strip():
+                    formatted_article = f"```\n{article}\n```"
+                    logger.info("Sending article to Slack")
                     response = client.chat_postMessage(
                         channel=slack_channel,
-                        text=formatted_message,
+                        text=formatted_article,
                         parse="full"
                     )
-                    
-                    if response["ok"]:
-                        logger.info(f"Successfully sent article {j} to Slack")
-                    else:
-                        logger.error(f"Failed to send article {j} to Slack: {response}")
-                        
-                except SlackApiError as e:
-                    logger.error(f"Slack API Error for article {j}: {str(e)}")
-                    continue
+                    if not response["ok"]:
+                        logger.error(f"Failed to send article to Slack: {response}")
+            
+            # Send remaining text (reasoning/other content) as a separate message
+            if remaining_text.strip():
+                formatted_remaining = f"```\n{remaining_text}\n```"
+                logger.info("Sending remaining content to Slack")
+                response = client.chat_postMessage(
+                    channel=slack_channel,
+                    text=formatted_remaining,
+                    parse="full"
+                )
+                if not response["ok"]:
+                    logger.error(f"Failed to send remaining content to Slack: {response}")
         
         return True
         
+    except SlackApiError as e:
+        logger.error(f"Slack API Error: {str(e)}")
+        return False
     except Exception as e:
         logger.error(f"Unexpected error in Slack sender: {str(e)}", exc_info=True)
         return False
