@@ -66,6 +66,20 @@ class Configuration:
         }
     )
 
+    ghost_cms_url: str = field(
+        default="",
+        metadata={
+            "description": "The base URL for the Ghost CMS API. Required for fetching tags and publishing articles."
+        },
+    )
+
+    ghost_api_key: str = field(
+        default="",
+        metadata={
+            "description": "The API key for accessing the Ghost CMS Content API."
+        },
+    )
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None

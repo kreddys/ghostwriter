@@ -50,7 +50,12 @@ async def slack_sender(
                     continue
                 
                 try:
-                    formatted_message = f"```\n{article.strip()}\n```"
+                    # Clean up the article content by removing any remaining tags
+                    cleaned_article = article.strip()
+                    cleaned_article = cleaned_article.replace("[ARTICLE_START]", "").replace("[ARTICLE_END]", "")
+                    cleaned_article = cleaned_article.strip()
+
+                    formatted_message = f"```\n{cleaned_article.strip()}\n```"
                     logger.info(f"Sending article {j} to Slack channel {slack_channel}")
                     
                     response = client.chat_postMessage(

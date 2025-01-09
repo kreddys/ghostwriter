@@ -8,6 +8,9 @@ from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
+from ..state import State
+from ..configuration import Configuration
+from ..tools.ghost_api import fetch_ghost_tags, GhostTag
 
 from ..state import State
 from ..configuration import Configuration
@@ -33,6 +36,18 @@ async def article_writer_agent(
 
     configuration = Configuration.from_runnable_config(config)
     logger.info(f"Using model: {configuration.model}")
+
+    # Fetch Ghost CMS tags
+    app_url = os.getenv("GHOST_APP_URL")
+    ghost_api_key = os.getenv("GHOST_API_KEY")
+    
+    if not app_url:
+        raise ValueError("GHOST_APP_URL environment variable not set")
+    if not ghost_api_key:  # Add this check
+        raise ValueError("GHOST_API_KEY environment variable not set")
+    
+    ghost_tags = await fetch_ghost_tags(app_url, ghost_api_key)
+    tag_names = [tag.name for tag in ghost_tags]
 
     # Initialize the appropriate model
     if configuration.model.startswith("deepseek/"):
@@ -71,20 +86,22 @@ async def article_writer_agent(
 
     messages = [
         SystemMessage(
-            content="""You are a skilled writer and content organizer. Using the provided search results, create articles in clean markdown format:
+            content=f"""You are a skilled writer and content organizer. Using the provided search results, create articles in clean markdown format:
                 1. Identify distinct topics or themes in the search results
                 2. Create multiple articles, one for each major topic
                 3. Each article should follow this format:
-
+                
+                Available tags (use only these, do not create new ones):
+                {', '.join(tag_names)}
+                
                 [ARTICLE_START]
                 # <article title>
 
                 <meta description - compelling summary in 150-160 characters>
 
-                ## Tags
-                - tag1
-                - tag2
-                - tag3
+            ## Tags
+            - Choose 2-3 most relevant tags from the available list
+            - Tags must match exactly as shown above
 
                 ## Content
                 <article content in pure markdown format - use proper headings, lists, code blocks, etc.>
