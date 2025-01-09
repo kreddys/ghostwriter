@@ -72,3 +72,49 @@ async def fetch_ghost_tags(app_url: str, api_key: str) -> List[GhostTag]:
     
     logger.info(f"Fetched {len(all_tags)} tags from Ghost CMS")
     return all_tags
+
+@dataclass
+class GhostArticle:
+    id: str
+    title: str
+    content: str
+    url: str
+
+async def fetch_ghost_articles(app_url: str, api_key: str) -> List[GhostArticle]:
+    """Fetch all articles from Ghost CMS API."""
+    all_articles = []
+    page = 1
+    
+    async with aiohttp.ClientSession() as session:
+        while True:
+            url = f"{app_url}/ghost/api/content/posts/?key={api_key}&page={page}&limit=100&formats=html"
+            
+            try:
+                async with session.get(url) as response:
+                    if response.status != 200:
+                        break
+                    
+                    data = await response.json()
+                    posts = data.get('posts', [])
+                    if not posts:
+                        break
+                    
+                    for post in posts:
+                        ghost_article = GhostArticle(
+                            id=post['id'],
+                            title=post['title'],
+                            content=post.get('html', ''),
+                            url=post['url']
+                        )
+                        all_articles.append(ghost_article)
+                    
+                    if not data.get('meta', {}).get('pagination', {}).get('next'):
+                        break
+                    
+                    page += 1
+                    
+            except Exception as e:
+                logger.error(f"Error fetching articles: {e}")
+                break
+    
+    return all_articles
