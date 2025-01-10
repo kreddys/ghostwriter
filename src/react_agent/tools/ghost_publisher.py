@@ -66,7 +66,7 @@ async def ghost_publisher(
                         }
                         
                         # Send to Ghost API with HTML source
-                        url = f"{ghost_url}/ghost/api/v3/admin/posts/?source=html"
+                        url = f"{ghost_url}/ghost/api/admin/posts/"
                         headers = {
                             "Authorization": f"Ghost {ghost_admin_api_key}",
                             "Content-Type": "application/json"
