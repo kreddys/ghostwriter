@@ -25,9 +25,9 @@ async def ghost_publisher(
     try:
         # Initialize credentials
         ghost_url = os.getenv("GHOST_APP_URL")
-        ghost_api_key = os.getenv("GHOST_API_KEY")
+        ghost_admin_api_key = os.getenv("GHOST_ADMIN_API_KEY")
         
-        if not all([ghost_url, ghost_api_key]):
+        if not all([ghost_url, ghost_admin_api_key]):
             logger.error("Missing Ghost credentials")
             return False
         
@@ -36,8 +36,22 @@ async def ghost_publisher(
         async with aiohttp.ClientSession() as session:
             for message in messages:
                 try:
+                    # Clean up the content by removing markdown code block markers
+                    content = message.content.strip()
+                    if content.startswith("```json"):
+                        content = content[7:]  # Remove ```json
+                    if content.endswith("```"):
+                        content = content[:-3]  # Remove ```
+                    content = content.strip()
+                    
+                    if not content:
+                        logger.error("Empty content after cleanup")
+                        continue
+                        
                     # Parse the JSON array of articles
-                    article_list = json.loads(message.content)
+                    article_list = json.loads(content)
+                    if not isinstance(article_list, list):
+                        article_list = [article_list]
                     
                     for article in article_list:
                         # Prepare article data for Ghost API
@@ -52,9 +66,9 @@ async def ghost_publisher(
                         }
                         
                         # Send to Ghost API with HTML source
-                        url = f"{ghost_url}/ghost/api/admin/posts/?source=html"
+                        url = f"{ghost_url}/ghost/api/v3/admin/posts/?source=html"
                         headers = {
-                            "Authorization": f"Ghost {ghost_api_key}",
+                            "Authorization": f"Ghost {ghost_admin_api_key}",
                             "Content-Type": "application/json"
                         }
                         
@@ -76,6 +90,7 @@ async def ghost_publisher(
                                 
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse article JSON: {str(e)}")
+                    logger.error(f"Content causing error: {content}")
                     continue
                 except Exception as e:
                     logger.error(f"Error processing article: {str(e)}")
