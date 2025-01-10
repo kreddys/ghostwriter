@@ -49,24 +49,22 @@ async def ghost_publisher(
                         logger.error("Empty content after cleanup")
                         continue
                         
-                    # Parse the JSON array of articles
-                    article_list = json.loads(content)
-                    if not isinstance(article_list, list):
-                        article_list = [article_list]
+                    # Parse the JSON content
+                    data = json.loads(content)
+                    posts = data.get("posts", [])
                     
-                    for article in article_list:
+                    for post in posts:
                         # Prepare article data for Ghost API
                         post_data = {
                             "posts": [{
-                                "title": article["title"],
-                                "html": article["html"],
-                                "excerpt": article.get("excerpt", ""),
-                                "tags": [{"name": tag} for tag in article.get("tags", [])],
+                                "title": post["title"],
+                                "lexical": post["lexical"],  # Use the lexical format directly
+                                "tags": [{"name": tag} for tag in post.get("tags", [])],
                                 "status": "draft"
                             }]
                         }
                         
-                        # Send to Ghost API with HTML source
+                        # Send to Ghost API
                         url = f"{ghost_url}/ghost/api/admin/posts/"
                         headers = {
                             "Authorization": f"Ghost {generate_ghost_token(ghost_admin_api_key)}",
@@ -81,11 +79,11 @@ async def ghost_publisher(
                                 
                                 # Send Slack notification
                                 await send_slack_notification(
-                                    title=article['title'],
-                                    tags=article.get('tags', []),
+                                    title=post['title'],
+                                    tags=post.get('tags', []),
                                     post_url=post_url
                                 )
-                                logger.info(f"Successfully created Ghost post: {article['title']}")
+                                logger.info(f"Successfully created Ghost post: {post['title']}")
                             else:
                                 error_data = await response.text()
                                 logger.error(f"Failed to create Ghost post: {response.status} - {error_data}")
