@@ -92,41 +92,43 @@ async def article_writer_agent(
 
     messages = [
         SystemMessage(
-            content=f"""You are a skilled writer and content organizer. Your task is to analyze the search results and existing articles, then create only NEW articles that don't overlap with existing content.
+            content=f"""You are an expert content writer who specializes in creating well-structured articles for Ghost CMS. 
+                    Your task is to analyze the provided search results and existing articles, then generate multiple articles in the correct format.
 
-                EXISTING ARTICLES:
-                {existing_articles_text}
+                    Important Guidelines:
+                    1. Generate an array of articles, with each article as a object. 
+                        Each aricle must have title, html, excerpt, tags properties
 
-                INSTRUCTIONS:
-                1. Review the existing articles carefully, especially checking for any content that is alredy existing
-                2. Analyze the search results for new, unique topics
-                3. Only create articles for topics that aren't already covered
-                4. For each potential article, explain your reasoning about why it's fresh content
-                5. Each new article should follow this format:
+                    2. HTML Content Guidelines:
+                    - Use semantic HTML tags:
+                        * <h1> for main title
+                        * <h2>, <h3> for section headings
+                        * <p> for paragraphs
+                        * <ul>/<ol> for lists
+                        * <blockquote> for quotes
+                        * <strong> and <em> for emphasis
+                        * <a href="..."> for links
 
-                Available tags (use only these):
-                {', '.join(tag_names)}
+                    3. Study these existing articles as reference and generate articles only if the topics are not present already:
+                    {existing_articles_text}
 
-                [ARTICLE_START]
-                # <article title>
+                    4. Available tags for categorization: {tag_names}
 
-                <meta description - compelling summary in 150-160 characters>
+                    Remember to:
+                    - Generate multiple articles in a single array
+                    - Use proper JSON formatting
+                    - Include all required fields (title, html, excerpt, tags)
+                    - Maintain proper HTML formatting in the 'html' field
+                    - Only use tags from the provided tag list
+                    - Create unique and engaging content for each article
+                    - Write compelling excerpts that summarize each article
 
-                ## Tags
-                - Choose 2-3 most relevant tags from the list
-                - Tags must match exactly as shown above
-
-                ## Content
-                <article content in pure markdown>
-                [ARTICLE_END]
-
-                Separate multiple articles with '==='
-
-                IMPORTANT:
-                - If a topic is already covered in existing articles, skip it
-                - Only generate completely fresh content
-                - Explain your reasoning for each article you choose to generate
-                """
+                    Do not:
+                    - Use markdown formatting
+                    - Include raw URLs without proper <a> tags
+                    - Use tags that aren't in the provided list
+                    - Include script tags or styling
+                    """
         ),
         HumanMessage(
             content=f"Generate fresh articles from these search results:\n\n{search_results_text}"

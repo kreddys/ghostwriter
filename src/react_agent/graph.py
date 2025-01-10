@@ -9,7 +9,7 @@ from langchain_core.messages import AIMessage
 from react_agent.state import State, InputState
 from react_agent.agents.article_writer import article_writer_agent
 from react_agent.tools.combined_search import combined_search
-from react_agent.tools.slack_sender import slack_sender
+from react_agent.tools.ghost_publisher import ghost_publisher
 
 logger = logging.getLogger(__name__)
 
@@ -32,22 +32,24 @@ async def process_search(state: State, config: RunnableConfig) -> State:
     
     return state
 
-async def publish_to_slack(state: State, config: RunnableConfig) -> State:
+async def publish_to_ghost(state: State, config: RunnableConfig) -> State:
     """
-    Publish articles to Slack and update state.
+    Publish articles to Ghost as drafts and notify via Slack.
     """
-    logger.info("Starting Slack publication process")
+    logger.info("Starting Ghost publication process")
     
     try:
         if hasattr(state, 'articles') and state.articles:
             logger.info(f"Found {len(state.articles.get('messages', []))} articles to publish")
-            await slack_sender(state.articles, config=config, state=state)
-            logger.info("Successfully published articles to Slack")
+            success = await ghost_publisher(state.articles, config=config, state=state)
+            if success:
+                logger.info("Successfully published articles to Ghost")
+            else:
+                logger.error("Failed to publish some articles to Ghost")
         else:
             logger.warning("No articles found in state to publish")
     except Exception as e:
-        logger.error(f"Error publishing to Slack: {str(e)}")
-        # Continue execution even if Slack publishing fails
+        logger.error(f"Error publishing to Ghost: {str(e)}")
         
     return state
 
@@ -60,7 +62,7 @@ def create_graph() -> StateGraph:
     # Add the nodes
     workflow.add_node("search", process_search)
     workflow.add_node("generate", article_writer_agent)
-    workflow.add_node("publish", publish_to_slack)
+    workflow.add_node("publish", publish_to_ghost)
     
     # Add the edges
     workflow.set_entry_point("search")

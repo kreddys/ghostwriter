@@ -1,5 +1,6 @@
 """Slack Sender functionality."""
 import logging
+import json
 from typing import Annotated, Dict, List
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -34,28 +35,19 @@ async def slack_sender(
         messages = articles.get("messages", [])
         
         for message in messages:
-            content = message.content
-            
-            # Split content into individual articles and remaining text
-            article_parts = []
-            remaining_text = content
-            
-            while "[ARTICLE_START]" in remaining_text and "[ARTICLE_END]" in remaining_text:
-                start_idx = remaining_text.find("[ARTICLE_START]")
-                end_idx = remaining_text.find("[ARTICLE_END]") + len("[ARTICLE_END]")
+            try:
+                # Parse the JSON array of articles from the message content
+                article_list = json.loads(message.content)
                 
-                if start_idx != -1 and end_idx != -1:
-                    article = remaining_text[start_idx:end_idx]
-                    article = article.replace("[ARTICLE_START]", "").replace("[ARTICLE_END]", "").strip()
-                    article_parts.append(article)
-                    remaining_text = remaining_text[end_idx:].strip()
-                else:
-                    break
-            
-            # Send each article as a separate message with buttons
-            for idx, article in enumerate(article_parts):
-                if article.strip():
-                    formatted_article = f"```\n{article}\n```"
+                # Send each article as a separate message with buttons
+                for idx, article in enumerate(article_list):
+                    # Format the article content for Slack
+                    article_text = (
+                        f"*Title:* {article['title']}\n\n"
+                        f"*Excerpt:* {article['excerpt']}\n\n"
+                        f"*Tags:* {', '.join(article['tags'])}\n\n"
+                        f"*Content:*\n{article['html']}"
+                    )
                     
                     # Create blocks for message with buttons
                     blocks = [
@@ -63,7 +55,7 @@ async def slack_sender(
                             "type": "section",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": formatted_article
+                                "text": article_text[:3000]  # Slack has a text limit
                             }
                         },
                         {
@@ -77,7 +69,10 @@ async def slack_sender(
                                     },
                                     "style": "primary",
                                     "action_id": f"approve_article_{idx}",
-                                    "value": article  # Store article content in button value
+                                    "value": json.dumps({
+                                        "title": article["title"],
+                                        "tags": article["tags"]
+                                    })  # Store minimal article info in button value
                                 },
                                 {
                                     "type": "button",
@@ -92,25 +87,22 @@ async def slack_sender(
                         }
                     ]
                     
-                    logger.info(f"Sending article {idx + 1} to Slack")
+                    logger.info(f"Sending article {idx + 1} to Slack: {article['title']}")
                     response = client.chat_postMessage(
                         channel=slack_channel,
                         blocks=blocks,
-                        text=formatted_article  # Fallback text
+                        text=f"New article: {article['title']}"  # Fallback text
                     )
+                    
                     if not response["ok"]:
                         logger.error(f"Failed to send article to Slack: {response}")
-            
-            # Send remaining text as a separate message
-            if remaining_text.strip():
-                formatted_remaining = f"```\n{remaining_text}\n```"
-                logger.info("Sending remaining content to Slack")
-                response = client.chat_postMessage(
-                    channel=slack_channel,
-                    text=formatted_remaining
-                )
-                if not response["ok"]:
-                    logger.error(f"Failed to send remaining content to Slack: {response}")
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse article JSON: {str(e)}")
+                continue
+            except Exception as e:
+                logger.error(f"Error processing article: {str(e)}")
+                continue
         
         return True
         
