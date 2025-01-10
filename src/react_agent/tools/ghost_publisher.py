@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage
 
 from ..state import State
 from .slack_notifier import send_slack_notification
-from react_agent.utils.ghost_token import generate_ghost_token
+from ..utils.ghost_token import generate_ghost_token
 
 logger = logging.getLogger(__name__)
 

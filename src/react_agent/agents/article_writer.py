@@ -8,12 +8,11 @@ from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
+
+from ..prompts import ARTICLE_WRITER_PROMPT
 from ..state import State
 from ..configuration import Configuration
 from ..tools.ghost_api import fetch_ghost_tags, GhostTag, fetch_ghost_articles, GhostArticle
-
-from ..state import State
-from ..configuration import Configuration
 
 logger = logging.getLogger(__name__)
 
@@ -91,48 +90,13 @@ async def article_writer_agent(
     )
 
     messages = [
-        SystemMessage(
-            content=f"""You are an expert content writer who specializes in creating well-structured articles for Ghost CMS. 
-                    Your task is to analyze the provided search results and existing articles, then generate multiple articles in the correct format.
-
-                    Important Guidelines:
-                    1. Generate an array of articles, with each article as a object. 
-                        Each aricle must have title, html, excerpt, tags properties
-
-                    2. HTML Content Guidelines:
-                    - Use semantic HTML tags:
-                        * <h1> for main title
-                        * <h2>, <h3> for section headings
-                        * <p> for paragraphs
-                        * <ul>/<ol> for lists
-                        * <blockquote> for quotes
-                        * <strong> and <em> for emphasis
-                        * <a href="..."> for links
-
-                    3. Study these existing articles as reference and generate articles only if the topics are not present already:
-                    {existing_articles_text}
-
-                    4. Available tags for categorization: {tag_names}
-
-                    Remember to:
-                    - Generate multiple articles in a single array
-                    - Use proper JSON formatting
-                    - Include all required fields (title, html, excerpt, tags)
-                    - Maintain proper HTML formatting in the 'html' field
-                    - Only use tags from the provided tag list
-                    - Create unique and engaging content for each article
-                    - Write compelling excerpts that summarize each article
-
-                    Do not:
-                    - Use markdown formatting
-                    - Include raw URLs without proper <a> tags
-                    - Use tags that aren't in the provided list
-                    - Include script tags or styling
-                    """
-        ),
-        HumanMessage(
-            content=f"Generate fresh articles from these search results:\n\n{search_results_text}"
-        ),
+    SystemMessage(
+        content=ARTICLE_WRITER_PROMPT.format(
+            existing_articles_text=existing_articles_text,
+            tag_names=tag_names,
+            topic=search_results_text  # Pass the search results as the topic
+            )
+        )
     ]
 
     # Generate response using the model
