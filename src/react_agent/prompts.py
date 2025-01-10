@@ -29,10 +29,8 @@ Important formatting rules:
 4. Keep the lexical format properties exactly as shown (detail:0, format:0, mode:"normal", etc.)
 5. Ensure all JSON is properly escaped and valid
 
-Here are the web search results on latest topics, generate one or multiple New and Unique News articles using this content : {web_search_results}
+Here are the web search results on latest topics, generate one or multiple NEW and UNIQUE News articles using this content : {web_search_results}
 
-Study these existing News articles as reference and generate articles only if the topics are not covered already in these existing articles:
-{existing_articles_text}
 
 Available tags for categorization: {tag_names}
 

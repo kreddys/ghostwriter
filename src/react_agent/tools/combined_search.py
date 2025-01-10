@@ -34,9 +34,9 @@ async def combined_search(
     if google_results:
         filtered_google = [r for r in google_results if is_relevant_to_amaravati(r)]
         combined_results.extend(filtered_google)
-    if tavily_results:
-        filtered_tavily = [r for r in tavily_results if is_relevant_to_amaravati(r)]
-        combined_results.extend(filtered_tavily)
+    # if tavily_results:
+    #     filtered_tavily = [r for r in tavily_results if is_relevant_to_amaravati(r)]
+    #     combined_results.extend(filtered_tavily)
     
     # Sort by date if available
     combined_results.sort(

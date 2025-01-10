@@ -92,9 +92,8 @@ async def article_writer_agent(
     messages = [
     SystemMessage(
         content=ARTICLE_WRITER_PROMPT.format(
-            existing_articles_text=existing_articles_text,
             tag_names=tag_names,
-            web_search_results=search_results_text  # Pass the search results as the topic
+            web_search_results=search_results_text
             )
         )
     ]
