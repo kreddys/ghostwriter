@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 from ..prompts import ARTICLE_WRITER_PROMPT
 from ..state import State
 from ..configuration import Configuration
-from ..tools.ghost_api import fetch_ghost_tags, GhostTag, fetch_ghost_articles, GhostArticle
+from ..utils.ghost_api import fetch_ghost_tags, GhostTag, fetch_ghost_articles, GhostArticle
 
 logger = logging.getLogger(__name__)
 
