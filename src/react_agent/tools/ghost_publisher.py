@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage
 
 from ..state import State
 from .slack_notifier import send_slack_notification
+from react_agent.utils.ghost_token import generate_ghost_token
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,8 @@ async def ghost_publisher(
                         # Send to Ghost API with HTML source
                         url = f"{ghost_url}/ghost/api/admin/posts/"
                         headers = {
-                            "Authorization": f"Ghost {ghost_admin_api_key}",
+                            "Authorization": f"Ghost {generate_ghost_token(ghost_admin_api_key)}",
+                            "Accept-Version": "v5.0",
                             "Content-Type": "application/json"
                         }
                         
