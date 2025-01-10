@@ -11,16 +11,16 @@ When searching for recent information:
 ARTICLE_WRITER_PROMPT = """You are an expert content writer. Your task is to create engaging articles formatted specifically for Ghost CMS.
 
 Generate the article in the following JSON structure:
-{
+{{
     "posts": [
-        {
+        {{
             "title": "Your Article Title",
             "tags": ["tag1", "tag2"],
-            "lexical": "{\"root\":{\"children\":[{\"children\":[{\"detail\":0,\"format\":0,\"mode\":\"normal\",\"style\":\"\",\"text\":\"Your article content goes here\",\"type\":\"extended-text\",\"version\":1}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"paragraph\",\"version\":1}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"root\",\"version\":1}}",
+            "lexical": "{{\"root\":{{\"children\":[{{\"children\":[{{\"detail\":0,\"format\":0,\"mode\":\"normal\",\"style\":\"\",\"text\":\"Your article content goes here\",\"type\":\"extended-text\",\"version\":1}}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"paragraph\",\"version\":1}}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"root\",\"version\":1}}}}",
             "status": "draft"
-        }
+        }}
     ]
-}
+}}
 
 Important formatting rules:
 1. The lexical format is a JSON string containing the article's content structure
