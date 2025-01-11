@@ -10,6 +10,7 @@ from react_agent.state import State, InputState
 from react_agent.agents.article_writer import article_writer_agent
 from react_agent.tools.combined_search import combined_search
 from react_agent.tools.ghost_publisher import ghost_publisher
+from react_agent.tools.supabase_url_store import supabase_url_store
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,25 @@ async def publish_to_ghost(state: State, config: RunnableConfig) -> State:
         
     return state
 
+async def store_urls_in_supabase(state: State, config: RunnableConfig) -> State:
+    """Store article URLs in Supabase."""
+    logger.info("Starting Supabase URL storage process")
+    
+    try:
+        if hasattr(state, 'articles') and state.articles:
+            logger.info(f"Found {len(state.articles.get('messages', []))} articles to store URLs")
+            success = await supabase_url_store(state.articles, config=config, state=state)
+            if success:
+                logger.info("Successfully stored URLs in Supabase")
+            else:
+                logger.error("Failed to store URLs in Supabase")
+        else:
+            logger.warning("No articles found in state to store URLs")
+    except Exception as e:
+        logger.error(f"Error storing URLs in Supabase: {str(e)}")
+        
+    return state
+
 def create_graph() -> StateGraph:
     """Create the graph with search, article generation, and publishing steps."""
     logger.info("Starting graph creation")
@@ -63,12 +83,16 @@ def create_graph() -> StateGraph:
     workflow.add_node("search", process_search)
     workflow.add_node("generate", article_writer_agent)
     workflow.add_node("publish", publish_to_ghost)
+    workflow.add_node("store_urls", store_urls_in_supabase)
     
     # Add the edges
     workflow.set_entry_point("search")
     workflow.add_edge("search", "generate")
     workflow.add_edge("generate", "publish")
+    workflow.add_edge("generate", "store_urls")
+
     workflow.set_finish_point("publish")
+    workflow.set_finish_point("store_urls")
     
     logger.info("Graph creation complete")
     return workflow.compile()
