@@ -89,9 +89,8 @@ def create_graph() -> StateGraph:
     workflow.set_entry_point("search")
     workflow.add_edge("search", "generate")
     workflow.add_edge("generate", "publish")
-    workflow.add_edge("generate", "store_urls")
+    workflow.add_edge("publish", "store_urls")
 
-    workflow.set_finish_point("publish")
     workflow.set_finish_point("store_urls")
     
     logger.info("Graph creation complete")

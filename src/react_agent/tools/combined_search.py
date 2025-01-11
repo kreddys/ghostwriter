@@ -27,16 +27,16 @@ async def combined_search(
         text = (
             (result.get('title', '') + ' ' + result.get('content', '')).lower()
         )
-        return 'amaravati' in text and 'andhra pradesh' in text
+        return 'amaravati' in text
     
     # Filter and combine results
     combined_results = []
     if google_results:
         filtered_google = [r for r in google_results if is_relevant_to_amaravati(r)]
         combined_results.extend(filtered_google)
-    # if tavily_results:
-    #     filtered_tavily = [r for r in tavily_results if is_relevant_to_amaravati(r)]
-    #     combined_results.extend(filtered_tavily)
+    if tavily_results:
+        filtered_tavily = [r for r in tavily_results if is_relevant_to_amaravati(r)]
+        combined_results.extend(filtered_tavily)
     
     # Sort by date if available
     combined_results.sort(
