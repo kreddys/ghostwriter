@@ -31,19 +31,29 @@ def check_result_uniqueness(
     similarity_threshold: float = 0.85
 ) -> bool:
     """Check if a search result is unique against Pinecone database."""
+    # Skip if no title or content
+    if not result.get('title') and not result.get('content'):
+        logger.warning("Result missing both title and content")
+        return False
+        
     query = f"Title: {result.get('title', '')}\nContent: {result.get('content', '')}"
     
-    # Search for similar documents
-    similar_results = vector_store.similarity_search_with_score(
-        query,
-        k=1
-    )
-    
-    if not similar_results:
-        return True
+    try:
+        # Search for similar documents
+        similar_results = vector_store.similarity_search_with_score(
+            query,
+            k=1
+        )
         
-    _, score = similar_results[0]
-    return score <= similarity_threshold
+        if not similar_results:
+            return True
+            
+        _, score = similar_results[0]
+        return score <= similarity_threshold
+        
+    except Exception as e:
+        logger.error(f"Error during similarity search: {str(e)}")
+        return False
 
 async def uniqueness_checker(
     state: State,
@@ -60,7 +70,7 @@ async def uniqueness_checker(
         
         unique_results = {}
         
-        for source, results in state.search_results.items():
+        for query, results in state.search_results.items():
             if not isinstance(results, list):
                 continue
                 
@@ -68,11 +78,12 @@ async def uniqueness_checker(
             for result in results:
                 if check_result_uniqueness(result, vector_store):
                     source_unique_results.append(result)
-                    logger.info(f"Found unique result from {source}: {result.get('title', '')}")
+                    logger.info(f"Found unique result from {query}: {result.get('title', '')}")
                 else:
-                    logger.info(f"Skipped duplicate result from {source}: {result.get('title', '')}")
+                    logger.info(f"Skipped duplicate result from {query}: {result.get('title', '')}")
             
-            unique_results[source] = source_unique_results
+            if source_unique_results:
+                unique_results[query] = source_unique_results
         
         # Update state with unique results
         state.search_results = unique_results
