@@ -66,10 +66,7 @@ async def google_search(
         else:
             logger.warning("No items found in Google search response")
         
-        state.previous_searches.add(query)
-        if query not in state.search_results:
-            state.search_results[query] = []
-        state.search_results[query].extend(processed_results)
+        state.search_results[query] = processed_results
         
         logger.info(f"Successfully processed {len(processed_results)} Google search results")
         return processed_results

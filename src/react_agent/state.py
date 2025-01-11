@@ -44,22 +44,6 @@ class State(InputState):
 
     This class can be used to store any information needed throughout the agent's lifecycle.
     """
-
-    is_last_step: IsLastStep = field(default=False)
-    """
-    Indicates whether the current step is the last one before the graph raises an error.
-
-    This is a 'managed' variable, controlled by the state machine rather than user code.
-    It is set to 'True' when the step count reaches recursion_limit - 1.
-    """
-
-    # Additional attributes can be added here as needed.
-    # Common examples include:
-    # retrieved_documents: List[Document] = field(default_factory=list)
-    # extracted_entities: Dict[str, Any] = field(default_factory=dict)
-    # api_connections: Dict[str, Any] = field(default_factory=dict)
-    # Add new fields to track searches
-    previous_searches: set[str] = field(default_factory=set)
     search_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     articles: dict[str, list[AIMessage]] = field(default_factory=dict) 
     used_source_urls: dict[str, list[str]] = field(default_factory=dict)
