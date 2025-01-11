@@ -62,3 +62,4 @@ class State(InputState):
     previous_searches: set[str] = field(default_factory=set)
     search_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     articles: dict[str, list[AIMessage]] = field(default_factory=dict) 
+    used_source_urls: dict[str, list[str]] = field(default_factory=dict)

@@ -2,6 +2,7 @@
 
 
 import os
+import json
 import logging
 from typing import Dict, List
 from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
@@ -48,12 +49,6 @@ async def article_writer_agent(
     ghost_tags = await fetch_ghost_tags(app_url, ghost_api_key)
     tag_names = [tag.name for tag in ghost_tags]
 
-    existing_articles = await fetch_ghost_articles(app_url, ghost_api_key)
-    existing_articles_text = "\n\n".join([
-        f"Title: {article.title}\nContent: {article.content}"
-        for article in existing_articles
-    ])
-
     # Initialize the appropriate model
     if configuration.model.startswith("deepseek/"):
         logger.info("Initializing DeepSeek model")
@@ -81,13 +76,12 @@ async def article_writer_agent(
             all_results.extend(results)
     logger.info(f"Processing {len(all_results)} total search results")
 
-    # Create prompt with search results
-    search_results_text = "\n\n".join(
-        [
-            f"Title: {result.get('title', 'N/A')}\nContent: {result.get('content', 'N/A')}"
-            for result in all_results
-        ]
-    )
+    search_results_text = "\n\n".join([
+        f"Title: {result.get('title', 'N/A')}\n"
+        f"URL: {result.get('url', 'N/A')}\n"
+        f"Content: {result.get('content', 'N/A')}"
+        for result in all_results
+    ])
 
     messages = [
     SystemMessage(
@@ -105,7 +99,40 @@ async def article_writer_agent(
     # Store the generated articles in state
     if not hasattr(state, "articles"):
         state.articles = {}
+    
+    # Initialize used_source_urls if it doesn't exist
+    if not hasattr(state, "used_source_urls"):
+        state.used_source_urls = {}
 
+    try:
+        # Attempt to parse JSON response
+        article_data = json.loads(formatted_response)
+        
+        # Extract source URLs if present
+        source_urls = article_data.get('source_urls', [])
+        article_title = article_data.get('title', 'untitled')
+        
+        # Store URLs in state
+        state.used_source_urls[article_title] = source_urls
+        
+        # Log the used sources
+        if source_urls:
+            logger.info(f"URLs used for article generation:")
+            for url in source_urls:
+                logger.info(f"- {url}")
+        
+        logger.info(f"Successfully generated article: {article_title}")
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON response: {str(e)}")
+        # Store the raw response even if JSON parsing fails
+        source_urls = []
+        
+    except Exception as e:
+        logger.error(f"Error processing article: {str(e)}")
+        source_urls = []    
+    
+    # Always store the response in state.articles
     state.articles["messages"] = [AIMessage(content=formatted_response)]
     logger.info(f"Generated and stored articles in state")
 

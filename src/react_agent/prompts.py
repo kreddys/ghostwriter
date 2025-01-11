@@ -17,7 +17,8 @@ Generate the news article in the following JSON structure:
             "title": "Your Article Title",
             "tags": ["tag1", "tag2"],
             "lexical": "{{\"root\":{{\"children\":[{{\"children\":[{{\"detail\":0,\"format\":0,\"mode\":\"normal\",\"style\":\"\",\"text\":\"Your article content goes here\",\"type\":\"extended-text\",\"version\":1}}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"paragraph\",\"version\":1}}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"root\",\"version\":1}}}}",
-            "status": "draft"
+            "status": "draft",
+            "source_urls": ["url1", "url2", "url3"]  // List of URLs used to generate this article
         }}
     ]
 }}
@@ -28,6 +29,7 @@ Important formatting rules:
 3. The content must be placed in the "text" field within the lexical structure
 4. Keep the lexical format properties exactly as shown (detail:0, format:0, mode:"normal", etc.)
 5. Ensure all JSON is properly escaped and valid
+6. Include all source URLs that were actually used to generate the article content in the source_urls array.
 
 Here are the web search results on latest topics, generate one or multiple NEW and UNIQUE News articles using this content : {web_search_results}
 
