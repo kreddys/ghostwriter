@@ -74,6 +74,20 @@ async def store_urls_in_supabase(state: State, config: RunnableConfig) -> State:
         
     return state
 
+def should_generate_articles(state: State) -> Literal["generate", "end"]:
+    """Determine if we should proceed with article generation."""
+    if not hasattr(state, 'unique_results') or not state.unique_results:
+        logger.info("No unique results found - stopping the process")
+        return "end"
+    
+    total_results = sum(len(results) for results in state.unique_results.values() if isinstance(results, list))
+    if total_results == 0:
+        logger.info("No unique results to process - stopping the process")
+        return "end"
+        
+    logger.info(f"Found {total_results} unique results - proceeding with article generation")
+    return "generate"
+
 def create_graph() -> StateGraph:
     """Create the graph with search, article generation, and publishing steps."""
     logger.info("Starting graph creation")
@@ -82,15 +96,24 @@ def create_graph() -> StateGraph:
     
     # Add the nodes
     workflow.add_node("search", process_search)
-    workflow.add_node("check_uniqueness", uniqueness_checker)  # Add uniqueness checker
+    workflow.add_node("check_uniqueness", uniqueness_checker)
     workflow.add_node("generate", article_writer_agent)
     workflow.add_node("publish", publish_to_ghost)
     workflow.add_node("store_urls", store_urls_in_supabase)
     
-    # Add the edges
+    # Add conditional routing after uniqueness check
+    workflow.add_conditional_edges(
+        "check_uniqueness",
+        should_generate_articles,
+        {
+            "generate": "generate",
+            "end": workflow.end
+        }
+    )
+    
+    # Add the other edges
     workflow.set_entry_point("search")
-    workflow.add_edge("search", "check_uniqueness")  # Search results go through uniqueness checker
-    workflow.add_edge("check_uniqueness", "generate")  # Unique results go to article generator
+    workflow.add_edge("search", "check_uniqueness")
     workflow.add_edge("generate", "publish")
     workflow.add_edge("publish", "store_urls")
 
