@@ -11,7 +11,7 @@ from react_agent.agents.article_writer import article_writer_agent
 from react_agent.tools.combined_search import combined_search
 from react_agent.tools.ghost_publisher import ghost_publisher
 from react_agent.tools.supabase_url_store import supabase_url_store
-from .tools.uniqueness_checker import UniquenessCheckerTool
+from react_agent.tools.uniqueness_checker import uniqueness_checker
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ def create_graph() -> StateGraph:
     
     # Add the nodes
     workflow.add_node("search", process_search)
-    workflow.add_node("check_uniqueness", UniquenessCheckerTool())  # Add uniqueness checker
+    workflow.add_node("check_uniqueness", uniqueness_checker)  # Add uniqueness checker
     workflow.add_node("generate", article_writer_agent)
     workflow.add_node("publish", publish_to_ghost)
     workflow.add_node("store_urls", store_urls_in_supabase)

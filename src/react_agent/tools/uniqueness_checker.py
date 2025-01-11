@@ -1,51 +1,62 @@
-"""Tool for checking uniqueness of search results."""
+"""Tool for checking uniqueness of search results using Pinecone."""
 import logging
-from typing import Dict, List, Any, Annotated
+import os
+from typing import Dict, Annotated
 from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import BaseTool, InjectedToolArg
-from langchain_core.documents import Document
-from langchain_openai import OpenAIEmbeddings
-from langchain_core.vectorstores import InMemoryVectorStore
+from langchain_core.tools import InjectedToolArg
+from langchain_pinecone import PineconeEmbeddings, PineconeVectorStore
+from pinecone import Pinecone
 from ..state import State
 
 logger = logging.getLogger(__name__)
 
-class UniquenessCheckerTool(BaseTool):
-    name = "uniqueness_checker"
-    description = "Check and filter unique search results"
-    vector_store = InMemoryVectorStore(OpenAIEmbeddings())
+def init_pinecone():
+    """Initialize Pinecone client and index."""
+    if not os.getenv("PINECONE_API_KEY"):
+        raise ValueError("PINECONE_API_KEY environment variable not set")
+    
+    pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+    index_name = os.getenv("PINECONE_INDEX_NAME", "article-uniqueness")
+    
+    # Get existing index
+    existing_indexes = [index_info["name"] for index_info in pc.list_indexes()]
+    if index_name not in existing_indexes:
+        raise ValueError(f"Index {index_name} does not exist in Pinecone")
+    
+    return pc.Index(index_name)
 
-    def check_result_uniqueness(self, result: Dict, similarity_threshold: float = 0.85) -> bool:
-        """Check if a search result is unique."""
-        query = f"Title: {result.get('title', '')}\nContent: {result.get('content', '')}"
-        similar_docs = self.vector_store.similarity_search_with_score(query, k=1)
+def check_result_uniqueness(
+    result: Dict, 
+    vector_store: PineconeVectorStore,
+    similarity_threshold: float = 0.85
+) -> bool:
+    """Check if a search result is unique against Pinecone database."""
+    query = f"Title: {result.get('title', '')}\nContent: {result.get('content', '')}"
+    
+    # Search for similar documents
+    similar_results = vector_store.similarity_search_with_score(
+        query,
+        k=1
+    )
+    
+    if not similar_results:
+        return True
         
-        if not similar_docs:
-            return True
-            
-        doc, score = similar_docs[0]
-        return score <= similarity_threshold
+    _, score = similar_results[0]
+    return score <= similarity_threshold
 
-    def add_result(self, result: Dict):
-        """Add a search result to memory."""
-        document = Document(
-            page_content=f"Title: {result.get('title', '')}\nContent: {result.get('content', '')}",
-            metadata={
-                "url": result.get('url', ''),
-                "title": result.get('title', '')
-            }
-        )
-        self.vector_store.add_documents([document])
-
-    async def _arun(
-        self,
-        state: State,
-        config: Annotated[RunnableConfig, InjectedToolArg()],
-    ) -> State:
-        """
-        Filter and return unique search results.
-        """
-        logger.info("Starting uniqueness check for search results")
+async def uniqueness_checker(
+    state: State,
+    config: Annotated[RunnableConfig, InjectedToolArg()]
+) -> State:
+    """Filter and return unique search results using Pinecone."""
+    logger.info("Starting uniqueness check for search results using Pinecone")
+    
+    try:
+        # Initialize Pinecone and vector store
+        index = init_pinecone()
+        embeddings = PineconeEmbeddings(model="multilingual-e5-large")
+        vector_store = PineconeVectorStore(index=index, embedding=embeddings)
         
         unique_results = {}
         
@@ -55,10 +66,9 @@ class UniquenessCheckerTool(BaseTool):
                 
             source_unique_results = []
             for result in results:
-                if self.check_result_uniqueness(result):
+                if check_result_uniqueness(result, vector_store):
                     source_unique_results.append(result)
-                    self.add_result(result)
-                    logger.info(f"Added unique result from {source}: {result.get('title', '')}")
+                    logger.info(f"Found unique result from {source}: {result.get('title', '')}")
                 else:
                     logger.info(f"Skipped duplicate result from {source}: {result.get('title', '')}")
             
@@ -67,11 +77,7 @@ class UniquenessCheckerTool(BaseTool):
         # Update state with unique results
         state.search_results = unique_results
         return state
-
-    def _run(
-        self,
-        state: State,
-        config: Annotated[RunnableConfig, InjectedToolArg()],
-    ) -> State:
-        """Synchronous version of the tool (not implemented)."""
-        raise NotImplementedError("This tool only supports async execution")
+        
+    except Exception as e:
+        logger.error(f"Error in uniqueness checker: {str(e)}")
+        raise
