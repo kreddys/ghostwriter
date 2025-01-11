@@ -31,28 +31,53 @@ def check_result_uniqueness(
     similarity_threshold: float = 0.85
 ) -> bool:
     """Check if a search result is unique against Pinecone database."""
+    # Log input result
+    logger.info(f"Checking uniqueness for result: {result.get('title', 'No title')}")
+    logger.debug(f"Full result object: {result}")
+
     # Skip if no title or content
     if not result.get('title') and not result.get('content'):
         logger.warning("Result missing both title and content")
         return False
         
-    query = f"Title: {result.get('title', '')}\nContent: {result.get('content', '')}"
+    content = f"Title: {result.get('title', '')}\nContent: {result.get('content', '')}"
+    logger.debug(f"Generated content for similarity search: {content[:200]}...")
     
     try:
-        # Search for similar documents
+        # Log search attempt
+        logger.info(f"Performing similarity_search_with_score with k=1 and filter={'text': {'$exists': True}}")
+        
+        # Search for similar documents with scores
         similar_results = vector_store.similarity_search_with_score(
-            query,
-            k=1
+            content,
+            k=1,
+            filter={"text": {"$exists": True}}
         )
         
-        if not similar_results:
+        # Log search results
+        logger.info(f"Number of similar results found: {len(similar_results)}")
+        
+        if similar_results:
+            logger.info("Similar documents found:")
+            for doc, score in similar_results:
+                logger.info(f"Similarity score: {score}")
+                logger.info(f"Document content: {doc.page_content[:200]}...")
+                logger.info(f"Document metadata: {doc.metadata}")
+                
+            # Get the score from the most similar document
+            most_similar_doc, similarity_score = similar_results[0]
+            is_unique = similarity_score <= similarity_threshold
+            logger.info(f"Most similar document score: {similarity_score}")
+            logger.info(f"Is unique (score {similarity_score} <= threshold {similarity_threshold}): {is_unique}")
+            return is_unique
+        else:
+            logger.info("No similar documents found - result is unique")
             return True
             
-        _, score = similar_results[0]
-        return score <= similarity_threshold
-        
     except Exception as e:
-        logger.error(f"Error during similarity search: {str(e)}")
+        logger.error(f"Error during similarity search: {str(e)}", exc_info=True)
+        logger.error(f"Vector store type: {type(vector_store)}")
+        logger.error(f"Content length: {len(content)}")
         return False
 
 async def uniqueness_checker(
