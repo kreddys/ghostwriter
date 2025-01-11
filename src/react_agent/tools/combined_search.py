@@ -41,10 +41,18 @@ async def combined_search(
             combined_results.extend(serp_results)
             
         logger.info(f"Combined {len(combined_results)} total results before filtering")
+
+        # Store raw results
+        state.raw_search_results[query] = combined_results
+        logger.info(f"Stored {len(combined_results)} raw results")
         
         # Filter out existing URLs
         filtered_results = await filter_existing_urls(combined_results)
         logger.info(f"Filtered down to {len(filtered_results)} new results after URL filtering")
+
+        # Store URL filtered results
+        state.url_filtered_results[query] = filtered_results
+        logger.info(f"Stored {len(filtered_results)} URL-filtered results")
         
         # Sort by date if available
         try:

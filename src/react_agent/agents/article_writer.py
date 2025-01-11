@@ -71,7 +71,7 @@ async def article_writer_agent(
 
     # Process search results
     all_results = []
-    for results in state.search_results.values():
+    for results in state.unique_results.values():
         if isinstance(results, list):
             all_results.extend(results)
     logger.info(f"Processing {len(all_results)} total search results")

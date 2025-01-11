@@ -70,7 +70,7 @@ async def uniqueness_checker(
         
         unique_results = {}
         
-        for query, results in state.search_results.items():
+        for query, results in state.url_filtered_results.items():
             if not isinstance(results, list):
                 continue
                 
@@ -85,8 +85,10 @@ async def uniqueness_checker(
             if source_unique_results:
                 unique_results[query] = source_unique_results
         
-        # Update state with unique results
-        state.search_results = unique_results
+        # Store unique results in state
+        state.unique_results = unique_results
+        logger.info(f"Stored unique results in state")
+        
         return state
         
     except Exception as e:

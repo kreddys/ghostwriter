@@ -40,10 +40,17 @@ class InputState:
 
 @dataclass
 class State(InputState):
-    """Represents the complete state of the agent, extending InputState with additional attributes.
-
-    This class can be used to store any information needed throughout the agent's lifecycle.
-    """
-    search_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
-    articles: dict[str, list[AIMessage]] = field(default_factory=dict) 
+    """Represents the complete state of the agent, extending InputState with additional attributes."""
+    
+    # Raw search results from web search
+    raw_search_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    
+    # Results after URL filtering
+    url_filtered_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    
+    # Results after uniqueness checking
+    unique_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    
+    # Keep existing fields
+    articles: dict[str, list[AIMessage]] = field(default_factory=dict)
     used_source_urls: dict[str, list[str]] = field(default_factory=dict)
