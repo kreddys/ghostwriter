@@ -53,4 +53,3 @@ class State(InputState):
     
     # Keep existing fields
     articles: dict[str, list[AIMessage]] = field(default_factory=dict)
-    used_source_urls: dict[str, list[str]] = field(default_factory=dict)

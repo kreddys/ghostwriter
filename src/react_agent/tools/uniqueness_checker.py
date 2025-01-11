@@ -16,7 +16,7 @@ def init_pinecone():
         raise ValueError("PINECONE_API_KEY environment variable not set")
     
     pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-    index_name = os.getenv("PINECONE_INDEX_NAME", "article-uniqueness")
+    index_name = os.getenv("PINECONE_INDEX_NAME")
     
     # Get existing index
     existing_indexes = [index_info["name"] for index_info in pc.list_indexes()]
@@ -88,7 +88,7 @@ async def uniqueness_checker(
         # Store unique results in state
         state.unique_results = unique_results
         logger.info(f"Stored unique results in state")
-        
+
         return state
         
     except Exception as e:
