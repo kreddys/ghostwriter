@@ -6,6 +6,7 @@ from langchain_core.tools import InjectedToolArg
 
 from ..utils.google_search import google_search
 from ..utils.tavily_search import tavily_search
+from ..utils.serp_search import serp_search
 from ..utils.url_filter import filter_existing_urls
 from ..state import State
 
@@ -16,16 +17,19 @@ async def combined_search(
     config: Annotated[RunnableConfig, InjectedToolArg],
     state: State
 ) -> Optional[List[Dict[str, Any]]]:
-    """Combine results from both Google and Tavily search."""
+    """Combine results from Google, Tavily, and SerpAPI search."""
     logger.info(f"Starting combined search for query: {query}")
     
     try:
-        # Get results from both sources
+        # Get results from all sources
         google_results = await google_search(query, config=config, state=state)
         logger.info(f"Retrieved {len(google_results) if google_results else 0} results from Google")
         
         tavily_results = await tavily_search(query, config=config, state=state)
         logger.info(f"Retrieved {len(tavily_results) if tavily_results else 0} results from Tavily")
+        
+        serp_results = await serp_search(query, config=config, state=state)
+        logger.info(f"Retrieved {len(serp_results) if serp_results else 0} results from SerpAPI")
         
         # Combine results
         combined_results = []
@@ -33,6 +37,8 @@ async def combined_search(
             combined_results.extend(google_results)
         if tavily_results:
             combined_results.extend(tavily_results)
+        if serp_results:
+            combined_results.extend(serp_results)
             
         logger.info(f"Combined {len(combined_results)} total results before filtering")
         
