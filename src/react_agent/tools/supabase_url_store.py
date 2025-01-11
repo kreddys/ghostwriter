@@ -33,6 +33,7 @@ async def supabase_url_store(
         supabase: Client = create_client(supabase_url, supabase_key)
         
         messages = articles.get("messages", [])
+        logger.info(f"Processing {len(messages)} messages")
         
         for message in messages:
             try:
@@ -47,29 +48,40 @@ async def supabase_url_store(
                 if not content:
                     logger.error("Empty content after cleanup")
                     continue
+                
+                # Log the content before parsing
+                logger.debug(f"Attempting to parse content: {content}")
                     
                 # Parse the JSON content
                 data = json.loads(content)
+                posts = data.get("posts", [])
                 
-                # Extract title and source URLs
-                title = data.get("title", "untitled")
-                source_urls = data.get("source_urls", [])
+                logger.info(f"Found {len(posts)} posts to process")
                 
-                if source_urls:
-                    # Insert URLs into Supabase
-                    for url in source_urls:
-                        data = {
-                            "article_title": title,
-                            "source_url": url,
-                            "created_at": "now()"
-                        }
-                        
-                        result = supabase.table("article_sources").insert(data).execute()
-                        
-                        if result.data:
-                            logger.info(f"Stored URL for article '{title}': {url}")
-                        else:
-                            logger.error(f"Failed to store URL: {url}")
+                for post in posts:
+                    # Extract title and source URLs
+                    title = post.get("title", "untitled")
+                    source_urls = post.get("source_urls", [])
+                    
+                    if source_urls:
+                        logger.info(f"Found {len(source_urls)} URLs for article '{title}'")
+                        # Insert URLs into Supabase
+                        for url in source_urls:
+                            data = {
+                                "article_title": title,
+                                "source_url": url,
+                                "created_at": "now()"
+                            }
+                            
+                            logger.debug(f"Inserting data: {data}")
+                            result = supabase.table("article_sources").insert(data).execute()
+                            
+                            if result.data:
+                                logger.info(f"Stored URL for article '{title}': {url}")
+                            else:
+                                logger.error(f"Failed to store URL: {url}")
+                    else:
+                        logger.warning(f"No source URLs found for article '{title}'")
                             
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse article JSON: {str(e)}")
