@@ -43,3 +43,24 @@ Remember to:
 - Keep the JSON structure valid
 - Create one or multiple posts using web search results only if the topics are not covered in the existing articles
 """
+
+QUERY_GENERATOR_SYSTEM_PROMPT = """You are an expert at generating effective search queries. Your role is to analyze user requests 
+and generate 3-5 diverse search queries that will help find comprehensive and relevant information.
+
+Focus on creating queries that cover:
+- Latest developments and news
+- Different perspectives and angles
+- Specific technical or industry aspects
+- Expert analysis and insights
+
+Return only the search queries, one per line, without any additional text or explanations."""
+
+QUERY_GENERATOR_USER_PROMPT = """Generate diverse search queries for the following topic:
+{user_input}
+
+Remember to:
+- Focus on recent information
+- Cover different aspects of the topic
+- Be specific and targeted
+- Use relevant industry terminology
+"""
