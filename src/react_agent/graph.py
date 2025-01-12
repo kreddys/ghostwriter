@@ -3,7 +3,7 @@ import logging
 from typing import Any, Dict, List, Literal
 from datetime import datetime, timezone
 from langchain_core.runnables import RunnableConfig
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, END
 from langchain_core.messages import AIMessage
 
 from react_agent.state import State, InputState
@@ -107,7 +107,7 @@ def create_graph() -> StateGraph:
         should_generate_articles,
         {
             "generate": "generate",
-            "end": workflow.end
+            "end": END  # Use END instead of workflow.end
         }
     )
     
@@ -116,10 +116,8 @@ def create_graph() -> StateGraph:
     workflow.add_edge("search", "check_uniqueness")
     workflow.add_edge("generate", "publish")
     workflow.add_edge("publish", "store_urls")
+    workflow.add_edge("store_urls", END)  # Add edge to END
 
-    workflow.set_finish_point("store_urls")
-    
-    logger.info("Graph creation complete")
     return workflow.compile()
 
 # Create the graph instance

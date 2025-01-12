@@ -7,11 +7,12 @@ from langchain_core.tools import InjectedToolArg
 from langchain_pinecone import PineconeEmbeddings, PineconeVectorStore
 from pinecone import Pinecone
 from ..state import State
+from ..utils.ghost_api import fetch_ghost_articles
 
 logger = logging.getLogger(__name__)
 
-def init_pinecone():
-    """Initialize Pinecone client and index."""
+async def init_pinecone_with_ghost_articles():
+    """Initialize Pinecone client and index, and populate with Ghost articles."""
     if not os.getenv("PINECONE_API_KEY"):
         raise ValueError("PINECONE_API_KEY environment variable not set")
     
@@ -23,7 +24,52 @@ def init_pinecone():
     if index_name not in existing_indexes:
         raise ValueError(f"Index {index_name} does not exist in Pinecone")
     
-    return pc.Index(index_name)
+    index = pc.Index(index_name)
+    
+    # Initialize vector store with embeddings
+    embeddings = PineconeEmbeddings(model="multilingual-e5-large")
+    vector_store = PineconeVectorStore(index=index, embedding=embeddings)
+    
+    # Fetch Ghost articles
+    try:
+        ghost_url = os.getenv("GHOST_APP_URL")
+        ghost_api_key = os.getenv("GHOST_API_KEY")
+        
+        if not all([ghost_url, ghost_api_key]):
+            logger.warning("Ghost credentials not configured, skipping article fetch")
+            return vector_store
+            
+        articles = await fetch_ghost_articles(ghost_url, ghost_api_key)
+        logger.info(f"Fetched {len(articles)} articles from Ghost")
+        
+        # Store articles in vector store
+        for article in articles:
+            try:
+                content = f"Title: {article.title}\nContent: {article.content}"
+                metadata = {
+                    "url": article.url,
+                    "title": article.title,
+                    "id": article.id,
+                    "source": "ghost"
+                }
+                
+                vector_store.add_texts(
+                    texts=[content],
+                    metadatas=[metadata],
+                    ids=[article.id]
+                )
+                logger.debug(f"Stored Ghost article: {article.title}")
+                
+            except Exception as e:
+                logger.error(f"Error storing article {article.title}: {str(e)}")
+                continue
+                
+        logger.info("Completed storing Ghost articles in Pinecone")
+        
+    except Exception as e:
+        logger.error(f"Error fetching/storing Ghost articles: {str(e)}")
+        
+    return vector_store
 
 def check_result_uniqueness(
     result: Dict, 
@@ -44,17 +90,14 @@ def check_result_uniqueness(
     logger.debug(f"Generated content for similarity search: {content[:200]}...")
     
     try:
-        # Log search attempt
-        logger.info(f"Performing similarity_search_with_score with k=1 and filter={'text': {'$exists': True}}")
-        
+
         # Search for similar documents with scores
         similar_results = vector_store.similarity_search_with_score(
             content,
             k=1,
-            filter={"text": {"$exists": True}}
         )
         
-        # Log search results
+        # Rest of the function remains the same
         logger.info(f"Number of similar results found: {len(similar_results)}")
         
         if similar_results:
@@ -64,7 +107,6 @@ def check_result_uniqueness(
                 logger.info(f"Document content: {doc.page_content[:200]}...")
                 logger.info(f"Document metadata: {doc.metadata}")
                 
-            # Get the score from the most similar document
             most_similar_doc, similarity_score = similar_results[0]
             is_unique = similarity_score <= similarity_threshold
             logger.info(f"Most similar document score: {similarity_score}")
@@ -73,6 +115,12 @@ def check_result_uniqueness(
         else:
             logger.info("No similar documents found - result is unique")
             return True
+            
+    except Exception as e:
+        logger.error(f"Error during similarity search: {str(e)}", exc_info=True)
+        logger.error(f"Vector store type: {type(vector_store)}")
+        logger.error(f"Content length: {len(content)}")
+        return False
             
     except Exception as e:
         logger.error(f"Error during similarity search: {str(e)}", exc_info=True)
@@ -88,10 +136,8 @@ async def uniqueness_checker(
     logger.info("Starting uniqueness check for search results using Pinecone")
     
     try:
-        # Initialize Pinecone and vector store
-        index = init_pinecone()
-        embeddings = PineconeEmbeddings(model="multilingual-e5-large")
-        vector_store = PineconeVectorStore(index=index, embedding=embeddings)
+        # Initialize Pinecone and vector store with Ghost articles
+        vector_store = await init_pinecone_with_ghost_articles()
         
         unique_results = {}
         
