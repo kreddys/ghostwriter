@@ -13,6 +13,8 @@ from ..configuration import Configuration
 
 logger = logging.getLogger(__name__)
 
+from langchain_core.messages import SystemMessage, HumanMessage
+
 async def generate_queries(
     user_input: str,
     *,
@@ -45,18 +47,17 @@ async def generate_queries(
                 num_predict=4096,
             )
 
-        # Format prompts
-        system_prompt = QUERY_GENERATOR_SYSTEM_PROMPT
-        user_prompt = QUERY_GENERATOR_USER_PROMPT.format(
-            user_input=user_input
-        )
+        # Create messages in correct format
+        messages = [
+            SystemMessage(content=QUERY_GENERATOR_SYSTEM_PROMPT),
+            HumanMessage(content=QUERY_GENERATOR_USER_PROMPT.format(
+                user_input=user_input
+            ))
+        ]
 
         # Get LLM response
         response = await llm.ainvoke(
-            {
-                "system": system_prompt,
-                "user": user_prompt
-            },
+            messages,
             config=config
         )
 
