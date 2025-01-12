@@ -6,26 +6,15 @@ import numpy as np
 from typing import Dict, List, Annotated
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
 from pinecone import Pinecone
 
 from ..state import State
 from ..configuration import Configuration
 from ..tools.combined_search import combined_search
+from ..prompts import SEARCH_TERM_PROMPT
+from ..llm import get_llm
 
 logger = logging.getLogger(__name__)
-
-SEARCH_TERM_PROMPT = """
-Given the title and content of an article, generate a search query that will help find additional relevant information.
-Focus on the main topic and key concepts. The query should be concise but comprehensive enough to find related content.
-
-Article Title: {title}
-Article Content: {content}
-
-Generate a search query that will help find additional relevant information about this topic.
-Return only the search query, nothing else.
-"""
 
 def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
     """Calculate cosine similarity between two vectors."""
@@ -71,7 +60,7 @@ async def check_relevance(
 
 async def generate_search_term(
     result: Dict,
-    model: ChatOllama | ChatOpenAI
+    model
 ) -> str:
     """Generate a search term from a result's title and content."""
     try:
@@ -103,20 +92,8 @@ async def search_enricher(
         # Initialize Pinecone client
         pinecone_client = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
         
-        # Initialize the model for search term generation
-        if configuration.model.startswith("deepseek/"):
-            model = ChatOpenAI(
-                model="deepseek-chat",
-                openai_api_key=os.getenv("DEEPSEEK_API_KEY"),
-                openai_api_base="https://api.deepseek.com/v1",
-                temperature=0.7
-            )
-        else:
-            model = ChatOllama(
-                model=configuration.model.split("/")[1],
-                base_url="http://host.docker.internal:11434",
-                temperature=0.7
-            )
+        # Initialize the model using centralized LLM initialization
+        model = get_llm(configuration, temperature=0.7)
         
         enriched_results = {}
         

@@ -1,27 +1,24 @@
 """Article Writer Agent functionality."""
 
-
 import os
 import json
 import logging
 from typing import Dict, List
 from langchain_core.messages import AIMessage, SystemMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
 
 from ..prompts import ARTICLE_WRITER_PROMPT
 from ..state import State
 from ..configuration import Configuration
 from ..utils.ghost_api import fetch_ghost_tags, GhostTag, fetch_ghost_articles, GhostArticle
+from ..llm import get_llm 
 
 logger = logging.getLogger(__name__)
-
 
 async def article_writer_agent(
     state: State,
     config: RunnableConfig,
-) -> State:  # Changed return type to State
+) -> State:
     """
     Agent that processes search results and generates articles in Ghost-compatible format.
 
@@ -43,63 +40,71 @@ async def article_writer_agent(
     
     if not app_url:
         raise ValueError("GHOST_APP_URL environment variable not set")
-    if not ghost_api_key:  # Add this check
+    if not ghost_api_key:
         raise ValueError("GHOST_API_KEY environment variable not set")
     
     ghost_tags = await fetch_ghost_tags(app_url, ghost_api_key)
     tag_names = [tag.name for tag in ghost_tags]
 
-    # Initialize the appropriate model
-    if configuration.model.startswith("deepseek/"):
-        logger.info("Initializing DeepSeek model")
-        model = ChatOpenAI(
-            model="deepseek-chat",
-            openai_api_key=os.getenv("DEEPSEEK_API_KEY"),
-            openai_api_base="https://api.deepseek.com/v1",
-            temperature=0.8,
-            max_tokens=4096,
-        )
-    else:
-        logger.info("Initializing Ollama model")
-        model = ChatOllama(
-            model=configuration.model.split("/")[1],
-            base_url="http://host.docker.internal:11434",
-            temperature=0.8,
-            num_ctx=8192,
-            num_predict=4096,
-        )
+    model = get_llm(configuration, temperature=0.8, max_tokens=4096)    
 
-    # Process enriched results
     generated_articles = []
-    for results in state.enriched_results.values():
-        if isinstance(results, list):
-            for enriched_result in results:
-                # Prepare combined content from original and additional results
-                original_result = enriched_result["original_result"]
-                additional_results = enriched_result["additional_results"]
-                
-                combined_content = f"""
-                Original Article:
-                Title: {original_result.get('title', 'N/A')}
-                URL: {original_result.get('url', 'N/A')}
-                Content: {original_result.get('content', 'N/A')}
-                
-                Additional Information:
-                {format_additional_results(additional_results)}
-                """
-                
-                # Generate article using the combined content
-                messages = [
-                    SystemMessage(
-                        content=ARTICLE_WRITER_PROMPT.format(
-                            tag_names=tag_names,
-                            web_search_results=combined_content
+    
+    # Determine which results to use based on configuration
+    if configuration.use_search_enricher:
+        logger.info("Using enriched search results for article generation")
+        results_to_process = state.enriched_results
+        for results in results_to_process.values():
+            if isinstance(results, list):
+                for enriched_result in results:
+                    # Prepare combined content from original and additional results
+                    original_result = enriched_result["original_result"]
+                    additional_results = enriched_result["additional_results"]
+                    
+                    combined_content = f"""
+                    Original Article:
+                    Title: {original_result.get('title', 'N/A')}
+                    URL: {original_result.get('url', 'N/A')}
+                    Content: {original_result.get('content', 'N/A')}
+                    
+                    Additional Information:
+                    {format_additional_results(additional_results)}
+                    """
+                    
+                    messages = [
+                        SystemMessage(
+                            content=ARTICLE_WRITER_PROMPT.format(
+                                tag_names=tag_names,
+                                web_search_results=combined_content
+                            )
                         )
-                    )
-                ]
-                
-                response = await model.ainvoke(messages)
-                generated_articles.append(AIMessage(content=response.content))
+                    ]
+                    
+                    response = await model.ainvoke(messages)
+                    generated_articles.append(AIMessage(content=response.content))
+    else:
+        logger.info("Using unique search results for article generation")
+        results_to_process = state.unique_results
+        for results in results_to_process.values():
+            if isinstance(results, list):
+                for result in results:
+                    content = f"""
+                    Title: {result.get('title', 'N/A')}
+                    URL: {result.get('url', 'N/A')}
+                    Content: {result.get('content', 'N/A')}
+                    """
+                    
+                    messages = [
+                        SystemMessage(
+                            content=ARTICLE_WRITER_PROMPT.format(
+                                tag_names=tag_names,
+                                web_search_results=content
+                            )
+                        )
+                    ]
+                    
+                    response = await model.ainvoke(messages)
+                    generated_articles.append(AIMessage(content=response.content))
     
     # Store all generated articles
     state.articles["messages"] = generated_articles

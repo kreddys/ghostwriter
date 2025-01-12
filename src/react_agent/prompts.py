@@ -62,3 +62,24 @@ Example format:
     "recent developments topic 2025",
     "official announcements topic 2025"
 ]"""
+
+SEARCH_TERM_PROMPT = """
+Given the title and content of an article, generate a search query that will help find additional relevant information.
+Focus on the main topic and key concepts. The query should be concise but comprehensive enough to find related content.
+
+Article Title: {title}
+Article Content: {content}
+
+Generate a search query that will help find additional relevant information about this topic.
+Return only the search query, nothing else.
+"""
+
+RELEVANCY_CHECK_PROMPT = """You are a content relevancy checker. Your task is to determine if the given content is relevant to the specified topic.
+Topic: {topic}
+
+Content to check:
+Title: {title}
+Content: {content}
+
+Respond with either 'relevant' or 'not_relevant' followed by a brief explanation.
+"""

@@ -58,3 +58,5 @@ class State(InputState):
     enriched_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
 
     search_successful: bool = False
+
+    topic: str = "Amaravati, Andhra Pradesh Capital City"  # Add this field for the configured topic

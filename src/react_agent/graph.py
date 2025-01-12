@@ -1,6 +1,7 @@
 """Graph implementation for the React Agent."""
 import logging
 from langgraph.graph import StateGraph, END
+from langchain_core.runnables import RunnableConfig
 from react_agent.state import State, InputState
 from react_agent.agents.article_writer import article_writer_agent
 from react_agent.tools.uniqueness_checker import uniqueness_checker
@@ -35,14 +36,15 @@ def should_generate_articles(state: State) -> Literal["next_step", "end"]:
     logger.info(f"Found {total_results} unique results - proceeding to next step")
     return "next_step"
 
-def determine_next_step(state: State) -> str:
+
+def determine_next_step(state: State, config: RunnableConfig) -> dict:
     """Determine whether to use search enricher or go directly to generate."""
-    config = Configuration.from_runnable_config(state.config)
-    if config.use_search_enricher:
+    configuration = Configuration.from_runnable_config(config)
+    if configuration.use_search_enricher:
         logger.info("Search enrichment enabled, proceeding to enrich search")
-        return "enrich_search"
+        return {"next": "enrich_search"}
     logger.info("Search enrichment disabled, proceeding directly to generation")
-    return "generate"
+    return {"next": "generate"}
 
 def create_graph() -> StateGraph:
     """Create the graph with search, article generation, and publishing steps."""
@@ -77,10 +79,9 @@ def create_graph() -> StateGraph:
         }
     )
     
-    # Add conditional routing to either enrich_search or generate
     workflow.add_conditional_edges(
         "next_step",
-        determine_next_step,
+        lambda state, config: determine_next_step(state, config)["next"],
         {
             "enrich_search": "enrich_search",
             "generate": "generate"

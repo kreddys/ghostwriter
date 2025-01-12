@@ -4,10 +4,14 @@ import os
 from typing import Dict, Annotated
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
+from langchain_core.messages import SystemMessage
 from langchain_pinecone import PineconeEmbeddings, PineconeVectorStore
 from pinecone import Pinecone
 from ..state import State
 from ..utils.ghost_api import fetch_ghost_articles
+from ..configuration import Configuration
+from ..prompts import RELEVANCY_CHECK_PROMPT 
+from ..llm import get_llm
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +75,37 @@ async def init_pinecone_with_ghost_articles():
         
     return vector_store
 
+async def check_content_relevancy(content: dict, topic: str, model) -> bool:
+    """Check if content is relevant to the specified topic using LLM."""
+    try:
+        messages = [
+            SystemMessage(
+                content=RELEVANCY_CHECK_PROMPT.format(
+                    topic=topic,
+                    title=content.get('title', 'N/A'),
+                    content=content.get('content', 'N/A')
+                )
+            )
+        ]
+        
+        response = await model.ainvoke(messages)
+        is_relevant = response.content.lower().startswith('relevant')
+        logger.info(f"Relevancy check for '{content.get('title')}': {is_relevant}")
+        return is_relevant
+        
+    except Exception as e:
+        logger.error(f"Error in relevancy check: {str(e)}")
+        return False
+
 def check_result_uniqueness(
     result: Dict, 
     vector_store: PineconeVectorStore,
     similarity_threshold: float = 0.85
 ) -> bool:
     """Check if a search result is unique against Pinecone database."""
-    # Log input result
     logger.info(f"Checking uniqueness for result: {result.get('title', 'No title')}")
     logger.debug(f"Full result object: {result}")
 
-    # Skip if no title or content
     if not result.get('title') and not result.get('content'):
         logger.warning("Result missing both title and content")
         return False
@@ -90,7 +114,6 @@ def check_result_uniqueness(
     logger.debug(f"Generated content for similarity search: {content[:200]}...")
     
     try:
-        # Search for similar documents with scores
         similar_results = vector_store.similarity_search_with_score(
             content,
             k=1,
@@ -124,11 +147,16 @@ async def uniqueness_checker(
     state: State,
     config: Annotated[RunnableConfig, InjectedToolArg()]
 ) -> State:
-    """Filter and return unique search results using Pinecone."""
-    logger.info("Starting uniqueness check for search results using Pinecone")
+    """Filter and return unique search results using Pinecone and check topic relevancy."""
+    logger.info("Starting uniqueness and relevancy check for search results")
     
     try:
-        # Initialize Pinecone and vector store with Ghost articles
+        # Initialize configuration and LLM model
+        configuration = Configuration.from_runnable_config(config)
+        
+        model = get_llm(configuration, temperature=0.3)
+
+        # Initialize Pinecone and vector store
         vector_store = await init_pinecone_with_ghost_articles()
         
         unique_results = {}
@@ -139,9 +167,15 @@ async def uniqueness_checker(
                 
             source_unique_results = []
             for result in results:
+                # Check uniqueness first
                 if check_result_uniqueness(result, vector_store):
-                    source_unique_results.append(result)
-                    logger.info(f"Found unique result from {query}: {result.get('title', '')}")
+                    # Then check relevancy
+                    is_relevant = await check_content_relevancy(result, state.topic, model)
+                    if is_relevant:
+                        source_unique_results.append(result)
+                        logger.info(f"Found unique and relevant result from {query}: {result.get('title', '')}")
+                    else:
+                        logger.info(f"Skipped irrelevant result from {query}: {result.get('title', '')}")
                 else:
                     logger.info(f"Skipped duplicate result from {query}: {result.get('title', '')}")
             
@@ -150,7 +184,7 @@ async def uniqueness_checker(
         
         # Store unique results in state
         state.unique_results = unique_results
-        logger.info(f"Stored unique results in state")
+        logger.info(f"Stored {sum(len(results) for results in unique_results.values())} unique and relevant results in state")
 
         return state
         

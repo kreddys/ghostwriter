@@ -5,9 +5,8 @@ import logging
 from typing import Annotated, List
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
-from langchain_ollama import ChatOllama
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
+from ..llm import get_llm 
 
 from ..state import State
 from ..prompts import QUERY_GENERATOR_SYSTEM_PROMPT, QUERY_GENERATOR_USER_PROMPT
@@ -28,24 +27,7 @@ async def generate_queries(
         logger.info(f"Using model: {configuration.model}")
 
         # Initialize the appropriate model
-        if configuration.model.startswith("deepseek/"):
-            logger.info("Initializing DeepSeek model")
-            llm = ChatOpenAI(
-                model="deepseek-chat",
-                openai_api_key=os.getenv("DEEPSEEK_API_KEY"),
-                openai_api_base="https://api.deepseek.com/v1",
-                temperature=0.8,
-                max_tokens=4096,
-            )
-        else:
-            logger.info("Initializing Ollama model")
-            llm = ChatOllama(
-                model=configuration.model.split("/")[1],
-                base_url="http://host.docker.internal:11434",
-                temperature=0.8,
-                num_ctx=8192,
-                num_predict=4096,
-            )
+        llm = get_llm(configuration, temperature=0.3)
 
         # Create messages in correct format
         messages = [
