@@ -7,12 +7,18 @@ from react_agent.state import State
 from react_agent.agents.query_generator_agent import generate_queries
 from react_agent.tools.combined_search import combined_search
 from react_agent.utils.url_filter import filter_existing_urls
+from react_agent.configuration import Configuration
 
 logger = logging.getLogger(__name__)
 
 async def process_search(state: State, config: RunnableConfig) -> State:
     """Execute search using combined search functionality with multiple generated queries."""
     logger.info("Starting search process")
+
+    # Get configuration properly using Configuration class
+    configuration = Configuration.from_runnable_config(config)
+    use_query_generator = configuration.use_query_generator
+    use_url_filtering = configuration.use_url_filtering
     
     if not hasattr(state, 'search_results'):
         state.search_results = {}
@@ -28,9 +34,6 @@ async def process_search(state: State, config: RunnableConfig) -> State:
     logger.info(f"Processing initial query: {query}")
     
     try:
-        # Check if query generator is enabled in config
-        use_query_generator = config.get("configurable", {}).get("use_query_generator", True)
-        
         if use_query_generator:
             logger.info("Using query generator")
             # Generate multiple search queries using the function
@@ -80,9 +83,6 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                     
             logger.info(f"Retrieved {len(results)} results from combined search")
             
-            # Check if URL filtering is enabled in config
-            use_url_filtering = config.get("configurable", {}).get("use_url_filtering", True)
-            
             if use_url_filtering:
                 logger.info("Applying URL filtering")
                 filtered_results = await filter_existing_urls(results)
@@ -103,8 +103,7 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                     state=state
                 )
                 if results:
-                    # Apply URL filtering if enabled
-                    if config.get("configurable", {}).get("use_url_filtering", True):
+                    if use_url_filtering:
                         filtered_results = await filter_existing_urls(results)
                         state.url_filtered_results[query.lower()] = filtered_results
                     else:
@@ -123,8 +122,7 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                 state=state
             )
             if results:
-                # Apply URL filtering if enabled
-                if config.get("configurable", {}).get("use_url_filtering", True):
+                if use_url_filtering:
                     filtered_results = await filter_existing_urls(results)
                     state.url_filtered_results[query.lower()] = filtered_results
                 else:
