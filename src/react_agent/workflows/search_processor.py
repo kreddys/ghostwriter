@@ -25,9 +25,14 @@ async def process_search(state: State, config: RunnableConfig) -> State:
         
     if not hasattr(state, 'url_filtered_results'):
         state.url_filtered_results = {}
+
+    # Initialize search_successful flag
+    if not hasattr(state, 'search_successful'):
+        state.search_successful = False
         
     if not state.messages:
         logger.warning("No messages found in state")
+        state.search_successful = False
         return state
         
     query = state.messages[0].content
@@ -79,6 +84,7 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             )
             if not results:
                 logger.warning("No results found from search queries")
+                state.search_successful = False
                 return state
                     
             logger.info(f"Retrieved {len(results)} results from combined search")
@@ -86,11 +92,17 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             if use_url_filtering:
                 logger.info("Applying URL filtering")
                 filtered_results = await filter_existing_urls(results)
+                if not filtered_results:
+                    logger.warning("No results after URL filtering")
+                    state.search_successful = False
+                    return state
                 state.url_filtered_results[query.lower()] = filtered_results
+                state.search_successful = True
                 logger.info(f"Stored {len(filtered_results)} filtered results")
             else:
                 logger.info("URL filtering disabled, storing unfiltered results")
                 state.url_filtered_results[query.lower()] = results
+                state.search_successful = True
                 logger.info(f"Stored {len(results)} unfiltered results")
             
         except Exception as e:
@@ -105,11 +117,19 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                 if results:
                     if use_url_filtering:
                         filtered_results = await filter_existing_urls(results)
-                        state.url_filtered_results[query.lower()] = filtered_results
+                        if filtered_results:
+                            state.url_filtered_results[query.lower()] = filtered_results
+                            state.search_successful = True
+                        else:
+                            state.search_successful = False
                     else:
                         state.url_filtered_results[query.lower()] = results
+                        state.search_successful = True
+                else:
+                    state.search_successful = False
             except Exception as e2:
                 logger.error(f"Fallback search also failed: {str(e2)}")
+                state.search_successful = False
             return state
             
     except Exception as e:
@@ -124,10 +144,18 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             if results:
                 if use_url_filtering:
                     filtered_results = await filter_existing_urls(results)
-                    state.url_filtered_results[query.lower()] = filtered_results
+                    if filtered_results:
+                        state.url_filtered_results[query.lower()] = filtered_results
+                        state.search_successful = True
+                    else:
+                        state.search_successful = False
                 else:
                     state.url_filtered_results[query.lower()] = results
+                    state.search_successful = True
+            else:
+                state.search_successful = False
         except Exception as e2:
             logger.error(f"Final fallback search failed: {str(e2)}")
+            state.search_successful = False
         
     return state

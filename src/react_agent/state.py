@@ -56,3 +56,5 @@ class State(InputState):
     
     # Enriched Results of a unique search item
     enriched_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+
+    search_successful: bool = False
