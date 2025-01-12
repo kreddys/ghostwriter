@@ -80,6 +80,18 @@ class Configuration:
         },
     )
 
+    use_query_generator: bool = field(
+        default=True,
+        metadata={"help": "Whether to use query generator or direct search with user input"}
+    )
+
+    use_url_filtering: bool = field(
+        default=False,
+        metadata={
+            "description": "Whether to filter out URLs that already exist in Supabase"
+        }
+    )
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None
