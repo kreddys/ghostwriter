@@ -50,6 +50,7 @@ Your output must be a valid JSON array of search strings.
 - Always use the current year (2025) in queries
 - Avoid generating queries about controversies, political disputes, or contentious issues
 - Focus on factual, neutral information from reliable sources
+- Do not generate markdown format
 - Return results in JSON array format"""
 
 QUERY_GENERATOR_USER_PROMPT = """Generate 2-3 search queries to find the latest factual updates and news about: {user_input}
