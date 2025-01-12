@@ -82,16 +82,6 @@ async def combined_search(
             
         logger.info(f"Found {len(filtered_results)} results after URL filtering")
         
-        # Store filtered results in state - FIX: Store as dictionary with query as key
-        if hasattr(state, 'url_filtered_results'):
-            # Get the original query if it exists in the first query of queries list
-            query_key = queries[0] if queries else "default"
-            if isinstance(state.url_filtered_results, dict):
-                state.url_filtered_results[query_key] = filtered_results
-            else:
-                # Initialize as dictionary if it's not
-                state.url_filtered_results = {query_key: filtered_results}
-        
         return filtered_results
         
     except Exception as e:

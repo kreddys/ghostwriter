@@ -90,14 +90,12 @@ def check_result_uniqueness(
     logger.debug(f"Generated content for similarity search: {content[:200]}...")
     
     try:
-
         # Search for similar documents with scores
         similar_results = vector_store.similarity_search_with_score(
             content,
             k=1,
         )
         
-        # Rest of the function remains the same
         logger.info(f"Number of similar results found: {len(similar_results)}")
         
         if similar_results:
@@ -115,12 +113,6 @@ def check_result_uniqueness(
         else:
             logger.info("No similar documents found - result is unique")
             return True
-            
-    except Exception as e:
-        logger.error(f"Error during similarity search: {str(e)}", exc_info=True)
-        logger.error(f"Vector store type: {type(vector_store)}")
-        logger.error(f"Content length: {len(content)}")
-        return False
             
     except Exception as e:
         logger.error(f"Error during similarity search: {str(e)}", exc_info=True)
