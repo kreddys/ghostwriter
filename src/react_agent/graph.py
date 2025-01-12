@@ -12,7 +12,7 @@ from react_agent.tools.combined_search import combined_search
 from react_agent.tools.ghost_publisher import ghost_publisher
 from react_agent.tools.supabase_url_store import supabase_url_store
 from react_agent.tools.uniqueness_checker import uniqueness_checker
-from .agents.query_generator_agent import QueryGeneratorAgent
+from react_agent.agents.query_generator_agent import generate_queries
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +31,11 @@ async def process_search(state: State, config: RunnableConfig) -> State:
     logger.info(f"Processing initial query: {query}")
     
     try:
-        # Initialize query generator agent
-        query_generator = QueryGeneratorAgent(state)
-        
-        # Generate multiple search queries
-        search_queries = await query_generator.generate_queries(
+        # Generate multiple search queries using the function
+        search_queries = await generate_queries(
             query,
-            config=config
+            config=config,
+            state=state
         )
         
         # Execute combined search for each query
