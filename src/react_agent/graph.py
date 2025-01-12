@@ -20,9 +20,6 @@ async def process_search(state: State, config: RunnableConfig) -> State:
     """Execute search using combined search functionality with multiple generated queries."""
     logger.info("Starting search process")
     
-    if not hasattr(state, 'search_results'):
-        state.search_results = {}
-        
     if not state.messages:
         logger.warning("No messages found in state")
         return state
@@ -38,55 +35,32 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             state=state
         )
         
-        # Execute combined search for each query
-        all_results = []
-        for search_query in search_queries:
-            try:
-                results = await combined_search(
-                    search_query, 
-                    config=config, 
-                    state=state
-                )
-                if results:
-                    all_results.extend(results)
-                    logger.info(f"Retrieved {len(results)} results for query: {search_query}")
-            except Exception as e:
-                logger.error(f"Error in combined search for query '{search_query}': {str(e)}")
-                continue
-        
-        if not all_results:
-            logger.warning("No results found from any search queries")
+        # Execute combined search with all queries at once
+        try:
+            results = await combined_search(
+                search_queries,  # Pass all queries at once
+                config=config, 
+                state=state
+            )
+            if not results:
+                logger.warning("No results found from search queries")
+                return state
+                
+            logger.info(f"Retrieved {len(results)} results from combined search")
+            
+            # The combined_search now handles:
+            # 1. Deduplication by URL
+            # 2. Sorting by date
+            # 3. Storing in state.raw_search_results
+            # 4. Storing in state.unique_results
+            
+            # Store in search_results for backward compatibility
+            state.url_filtered_results[query.lower()] = results
+            
+        except Exception as e:
+            logger.error(f"Error in combined search: {str(e)}")
             return state
             
-        # Remove duplicates based on URL
-        seen_urls = set()
-        unique_results = []
-        for result in all_results:
-            url = result.get('url')
-            if url and url not in seen_urls:
-                unique_results.append(result)
-                seen_urls.add(url)
-        
-        # Sort results by date if available
-        try:
-            unique_results.sort(
-                key=lambda x: x.get('published_date', ''),
-                reverse=True
-            )
-        except Exception as e:
-            logger.warning(f"Error sorting results by date: {str(e)}")
-        
-        # Store results in state
-        state.search_results[query.lower()] = unique_results
-        logger.info(f"Stored {len(unique_results)} unique results for original query")
-        
-        # Store raw results for reference
-        state.raw_search_results[query.lower()] = all_results
-        logger.info(f"Stored {len(all_results)} raw results")
-        
-        # Store URL filtered results (will be used by uniqueness checker)
-        state.url_filtered_results[query.lower()] = unique_results
-        
     except Exception as e:
         logger.error(f"Error in process_search: {str(e)}")
         # Don't raise the exception to allow the graph to continue

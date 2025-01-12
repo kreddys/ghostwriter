@@ -1,19 +1,19 @@
 """Query Generator Agent implementation."""
 import os
+import json
 import logging
 from typing import Annotated, List
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
 
 from ..state import State
 from ..prompts import QUERY_GENERATOR_SYSTEM_PROMPT, QUERY_GENERATOR_USER_PROMPT
 from ..configuration import Configuration
 
 logger = logging.getLogger(__name__)
-
-from langchain_core.messages import SystemMessage, HumanMessage
 
 async def generate_queries(
     user_input: str,
@@ -61,16 +61,23 @@ async def generate_queries(
             config=config
         )
 
-        # Parse queries from response
-        queries = [
-            q.strip() for q in response.content.split('\n') 
-            if q.strip() and not q.startswith('-')
-        ]
+        # Parse JSON response
+        try:
+            queries = json.loads(response.content)
+            if not isinstance(queries, list):
+                raise ValueError("Response is not a JSON array")
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse JSON response, falling back to text parsing")
+            # Fallback to text parsing if JSON parsing fails
+            queries = [
+                q.strip() for q in response.content.split('\n') 
+                if q.strip() and not q.startswith('-')
+            ]
 
         # Validate and clean queries
         valid_queries = []
         for query in queries:
-            if len(query) > 0 and len(query) <= 256:  # reasonable length limit
+            if isinstance(query, str) and len(query) > 0 and len(query) <= 256:
                 valid_queries.append(query)
 
         if not valid_queries:
@@ -86,5 +93,4 @@ async def generate_queries(
 
     except Exception as e:
         logger.error(f"Error generating search queries: {str(e)}")
-        # Fallback to original query if generation fails
         return [user_input]
