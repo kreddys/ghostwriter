@@ -69,40 +69,55 @@ async def article_writer_agent(
             num_predict=4096,
         )
 
-    # Process search results
-    all_results = []
-    for results in state.unique_results.values():
+    # Process enriched results
+    generated_articles = []
+    for results in state.enriched_results.values():
         if isinstance(results, list):
-            all_results.extend(results)
-    logger.info(f"Processing {len(all_results)} total search results")
-
-    search_results_text = "\n\n".join([
-        f"Title: {result.get('title', 'N/A')}\n"
-        f"URL: {result.get('url', 'N/A')}\n"
-        f"Content: {result.get('content', 'N/A')}"
-        for result in all_results
-    ])
-
-    messages = [
-    SystemMessage(
-        content=ARTICLE_WRITER_PROMPT.format(
-            tag_names=tag_names,
-            web_search_results=search_results_text
-            )
-        )
-    ]
-
-    # Generate response using the model
-    response = await model.ainvoke(messages)
-    formatted_response = response.content
-
-    # Store the generated articles in state
-    if not hasattr(state, "articles"):
-        state.articles = {} 
+            for enriched_result in results:
+                # Prepare combined content from original and additional results
+                original_result = enriched_result["original_result"]
+                additional_results = enriched_result["additional_results"]
+                
+                combined_content = f"""
+                Original Article:
+                Title: {original_result.get('title', 'N/A')}
+                URL: {original_result.get('url', 'N/A')}
+                Content: {original_result.get('content', 'N/A')}
+                
+                Additional Information:
+                {format_additional_results(additional_results)}
+                """
+                
+                # Generate article using the combined content
+                messages = [
+                    SystemMessage(
+                        content=ARTICLE_WRITER_PROMPT.format(
+                            tag_names=tag_names,
+                            web_search_results=combined_content
+                        )
+                    )
+                ]
+                
+                response = await model.ainvoke(messages)
+                generated_articles.append(AIMessage(content=response.content))
     
-    # Always store the response in state.articles
-    state.articles["messages"] = [AIMessage(content=formatted_response)]
-    logger.info(f"Generated and stored articles in state")
-
+    # Store all generated articles
+    state.articles["messages"] = generated_articles
+    logger.info(f"Generated {len(generated_articles)} articles")
+    
     return state
 
+def format_additional_results(results: List[Dict]) -> str:
+    """Format additional search results for article generation."""
+    if not results:
+        return "No additional information found."
+        
+    formatted_results = []
+    for result in results:
+        formatted_results.append(
+            f"Title: {result.get('title', 'N/A')}\n"
+            f"URL: {result.get('url', 'N/A')}\n"
+            f"Content: {result.get('content', 'N/A')}\n"
+        )
+    
+    return "\n\n".join(formatted_results)

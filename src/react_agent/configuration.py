@@ -81,7 +81,7 @@ class Configuration:
     )
 
     use_query_generator: bool = field(
-        default=True,
+        default=False,
         metadata={"help": "Whether to use query generator or direct search with user input"}
     )
 

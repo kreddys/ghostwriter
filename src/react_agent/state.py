@@ -43,7 +43,7 @@ class State(InputState):
     """Represents the complete state of the agent, extending InputState with additional attributes."""
     
     # Raw search results from web search
-    raw_search_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    search_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     
     # Results after URL filtering
     url_filtered_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
@@ -53,3 +53,6 @@ class State(InputState):
     
     # Keep existing fields
     articles: dict[str, list[AIMessage]] = field(default_factory=dict)
+    
+    # Enriched Results of a unique search item
+    enriched_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
