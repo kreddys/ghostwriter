@@ -91,7 +91,12 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             
             if use_url_filtering:
                 logger.info("Applying URL filtering")
-                filtered_results = await filter_existing_urls(results)
+                filtered_results = await filter_existing_urls(
+                    search_results=state.search_results,
+                    state=state,
+                    max_articles_per_domain=3,
+                    url_similarity_threshold=0.85
+                )
                 if not filtered_results:
                     logger.warning("No results after URL filtering")
                     state.search_successful = False
@@ -116,7 +121,12 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                 )
                 if results:
                     if use_url_filtering:
-                        filtered_results = await filter_existing_urls(results)
+                        filtered_results = await filter_existing_urls(
+                            search_results=state.search_results,
+                            state=state,
+                            max_articles_per_domain=3,
+                            url_similarity_threshold=0.85
+                        )
                         if filtered_results:
                             state.url_filtered_results[query.lower()] = filtered_results
                             state.search_successful = True
@@ -143,7 +153,12 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             )
             if results:
                 if use_url_filtering:
-                    filtered_results = await filter_existing_urls(results)
+                    filtered_results = await filter_existing_urls(
+                        search_results=state.search_results,
+                        state=state,
+                        max_articles_per_domain=3,
+                        url_similarity_threshold=0.85
+                    )
                     if filtered_results:
                         state.url_filtered_results[query.lower()] = filtered_results
                         state.search_successful = True
