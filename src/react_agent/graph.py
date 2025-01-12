@@ -20,6 +20,9 @@ async def process_search(state: State, config: RunnableConfig) -> State:
     """Execute search using combined search functionality with multiple generated queries."""
     logger.info("Starting search process")
     
+    if not hasattr(state, 'search_results'):
+        state.search_results = {}
+        
     if not state.messages:
         logger.warning("No messages found in state")
         return state
@@ -35,10 +38,28 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             state=state
         )
         
-        # Execute combined search with all queries at once
+        # Clean up the queries - remove markdown formatting and parse JSON
+        if isinstance(search_queries, list) and search_queries:
+            # Remove markdown formatting artifacts
+            json_str = ' '.join(search_queries)
+            json_str = json_str.replace('```json', '').replace('```', '').strip()
+            
+            # Parse the JSON string to get actual queries
+            try:
+                import json
+                clean_queries = json.loads(json_str)
+                logger.info(f"Successfully parsed {len(clean_queries)} search queries")
+            except json.JSONDecodeError as e:
+                logger.error(f"Error parsing JSON queries: {str(e)}")
+                return state
+        else:
+            logger.warning("No valid search queries generated")
+            return state
+            
+        # Execute combined search with cleaned queries
         try:
             results = await combined_search(
-                search_queries,  # Pass all queries at once
+                clean_queries,
                 config=config, 
                 state=state
             )
@@ -47,12 +68,6 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                 return state
                 
             logger.info(f"Retrieved {len(results)} results from combined search")
-            
-            # The combined_search now handles:
-            # 1. Deduplication by URL
-            # 2. Sorting by date
-            # 3. Storing in state.raw_search_results
-            # 4. Storing in state.unique_results
             
             # Store in search_results for backward compatibility
             state.url_filtered_results[query.lower()] = results
@@ -63,9 +78,7 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             
     except Exception as e:
         logger.error(f"Error in process_search: {str(e)}")
-        # Don't raise the exception to allow the graph to continue
-        # but log it for debugging
-    
+        
     return state
 
 async def publish_to_ghost(state: State, config: RunnableConfig) -> State:

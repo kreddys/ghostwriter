@@ -52,7 +52,7 @@ Your output must be a valid JSON array of search strings.
 - Focus on factual, neutral information from reliable sources
 - Return results in JSON array format"""
 
-QUERY_GENERATOR_USER_PROMPT = """Generate 3-5 search queries to find the latest factual updates and news about: {user_input}
+QUERY_GENERATOR_USER_PROMPT = """Generate 2-3 search queries to find the latest factual updates and news about: {user_input}
 Return the queries as a JSON array of strings.
 
 Example format:
