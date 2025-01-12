@@ -31,6 +31,11 @@ Important formatting rules:
 5. Ensure all JSON is properly escaped and valid
 6. Include all source URLs that were actually used to generate the article content in the source_urls array.
 
+When writing the article:
+- Include source URLs in parentheses at the end of relevant statements or paragraphs
+- Ensure proper attribution of information to sources
+- Maintain a natural flow while incorporating references
+
 Here are the web search results on latest topics, generate one or multiple NEW and UNIQUE News articles using this content : {web_search_results}
 
 

@@ -86,16 +86,14 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                 logger.warning("No results found from search queries")
                 state.search_successful = False
                 return state
-                    
+            
+            state.search_results[query.lower()] = results
             logger.info(f"Retrieved {len(results)} results from combined search")
             
             if use_url_filtering:
                 logger.info("Applying URL filtering")
                 filtered_results = await filter_existing_urls(
-                    search_results=state.search_results,
-                    state=state,
-                    max_articles_per_domain=3,
-                    url_similarity_threshold=0.85
+                    search_results=state.search_results[query.lower()],
                 )
                 if not filtered_results:
                     logger.warning("No results after URL filtering")
@@ -122,10 +120,7 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                 if results:
                     if use_url_filtering:
                         filtered_results = await filter_existing_urls(
-                            search_results=state.search_results,
-                            state=state,
-                            max_articles_per_domain=3,
-                            url_similarity_threshold=0.85
+                            search_results=state.search_results[query.lower()],
                         )
                         if filtered_results:
                             state.url_filtered_results[query.lower()] = filtered_results
@@ -154,10 +149,7 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             if results:
                 if use_url_filtering:
                     filtered_results = await filter_existing_urls(
-                        search_results=state.search_results,
-                        state=state,
-                        max_articles_per_domain=3,
-                        url_similarity_threshold=0.85
+                        search_results=state.search_results[query.lower()],
                     )
                     if filtered_results:
                         state.url_filtered_results[query.lower()] = filtered_results
