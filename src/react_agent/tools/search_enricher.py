@@ -2,11 +2,13 @@
 
 import os
 import logging
+import numpy as np
 from typing import Dict, List, Annotated
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
+from pinecone import Pinecone
 
 from ..state import State
 from ..configuration import Configuration
@@ -25,19 +27,59 @@ Generate a search query that will help find additional relevant information abou
 Return only the search query, nothing else.
 """
 
+def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
+    """Calculate cosine similarity between two vectors."""
+    return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
+
+async def check_relevance(
+    original_result: Dict,
+    additional_result: Dict,
+    pinecone_client: Pinecone,
+    similarity_threshold: float = 0.75
+) -> bool:
+    """Check if an additional result is relevant to the original result using Pinecone embeddings."""
+    try:
+        # Prepare texts for embedding
+        original_text = f"{original_result.get('title', '')}. {original_result.get('content', '')}"
+        additional_text = f"{additional_result.get('title', '')}. {additional_result.get('snippet', '')}"
+        
+        # Generate embeddings
+        embeddings = pinecone_client.inference.embed(
+            model="multilingual-e5-large",
+            inputs=[original_text, additional_text],
+            parameters={"input_type": "passage", "truncate": "END"}
+        )
+        
+        # Extract embedding vectors
+        vec1 = np.array(embeddings.data[0].values)
+        vec2 = np.array(embeddings.data[1].values)
+        
+        # Calculate similarity
+        similarity = cosine_similarity(vec1, vec2)
+        is_relevant = similarity >= similarity_threshold
+        
+        logger.info(
+            f"Relevance score between '{original_result.get('title')}' and "
+            f"'{additional_result.get('title')}': {similarity:.4f}"
+        )
+        
+        return is_relevant
+        
+    except Exception as e:
+        logger.error(f"Error checking relevance: {str(e)}")
+        return False
+
 async def generate_search_term(
     result: Dict,
     model: ChatOllama | ChatOpenAI
 ) -> str:
     """Generate a search term from a result's title and content."""
     try:
-        # Prepare the prompt with the result data
         prompt = SEARCH_TERM_PROMPT.format(
             title=result.get('title', ''),
-            content=result.get('content', '')[:500]  # Limit content length
+            content=result.get('content', '')[:500]
         )
         
-        # Get search term from model
         response = await model.ainvoke([{"role": "user", "content": prompt}])
         search_term = response.content.strip()
         
@@ -46,7 +88,7 @@ async def generate_search_term(
         
     except Exception as e:
         logger.error(f"Error generating search term: {str(e)}")
-        return result.get('title', '')  # Fallback to using the title as search term
+        return result.get('title', '')
 
 async def search_enricher(
     state: State,
@@ -57,6 +99,9 @@ async def search_enricher(
     
     try:
         configuration = Configuration.from_runnable_config(config)
+        
+        # Initialize Pinecone client
+        pinecone_client = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
         
         # Initialize the model for search term generation
         if configuration.model.startswith("deepseek/"):
@@ -93,32 +138,70 @@ async def search_enricher(
                         state=state
                     )
                     
-                    # Combine original result with additional search results
-                    enriched_result = {
-                        "original_result": result,
-                        "additional_results": additional_results or []
-                    }
+                    # Filter relevant results
+                    relevant_results = []
+                    if additional_results:
+                        for additional_result in additional_results:
+                            is_relevant = await check_relevance(
+                                original_result=result,
+                                additional_result=additional_result,
+                                pinecone_client=pinecone_client
+                            )
+                            
+                            if is_relevant:
+                                relevant_results.append(additional_result)
+                                logger.info(
+                                    f"Found relevant result: "
+                                    f"'{additional_result.get('title')}'"
+                                )
+                            else:
+                                logger.info(
+                                    f"Skipping irrelevant result: "
+                                    f"'{additional_result.get('title')}'"
+                                )
                     
-                    enriched_query_results.append(enriched_result)
-                    logger.info(f"Enriched result for: {result.get('title')}")
+                    # Only include results with relevant additional content
+                    if relevant_results:
+                        enriched_result = {
+                            "original_result": result,
+                            "additional_results": relevant_results
+                        }
+                        enriched_query_results.append(enriched_result)
+                        logger.info(
+                            f"Added enriched result for '{result.get('title')}' "
+                            f"with {len(relevant_results)} relevant results"
+                        )
+                    else:
+                        logger.warning(
+                            f"No relevant additional results found for: "
+                            f"{result.get('title')}"
+                        )
                     
                 except Exception as e:
                     logger.error(f"Error enriching result: {str(e)}")
-                    # Include original result without enrichment
-                    enriched_query_results.append({
-                        "original_result": result,
-                        "additional_results": []
-                    })
+                    continue
             
             if enriched_query_results:
                 enriched_results[query] = enriched_query_results
+                logger.info(
+                    f"Stored {len(enriched_query_results)} enriched results "
+                    f"for query '{query}'"
+                )
+            else:
+                logger.warning(f"No enriched results found for query: {query}")
+        
+        if not enriched_results:
+            logger.warning("No relevant results found after enrichment")
+            state.search_successful = False
+            return state
         
         # Store enriched results in state
         state.enriched_results = enriched_results
-        logger.info(f"Stored enriched results in state")
+        logger.info("Enrichment complete")
         
         return state
         
     except Exception as e:
         logger.error(f"Error in search enricher: {str(e)}")
+        state.search_successful = False
         raise
