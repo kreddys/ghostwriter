@@ -64,8 +64,11 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             logger.warning("Invalid query format. Using original query.")
             clean_queries = [query]  # Fallback to original query
             
-        # Execute combined search with cleaned queries
         try:
+            # Initialize url_filtered_results as dictionary if not exists
+            if not hasattr(state, 'url_filtered_results'):
+                state.url_filtered_results = {}
+                
             results = await combined_search(
                 clean_queries,
                 config=config, 
@@ -74,15 +77,19 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             if not results:
                 logger.warning("No results found from search queries")
                 return state
-                
+                    
             logger.info(f"Retrieved {len(results)} results from combined search")
             
+            # Store results with query as key
             state.url_filtered_results[query.lower()] = results
             
         except Exception as e:
             logger.error(f"Error in combined search: {str(e)}")
             # Try one more time with original query if combined search fails
             try:
+                if not hasattr(state, 'url_filtered_results'):
+                    state.url_filtered_results = {}
+                    
                 results = await combined_search(
                     [query],
                     config=config,
