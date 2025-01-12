@@ -33,33 +33,33 @@ async def combined_search(
     
     # Step 1: Execute searches for all queries and collect results
     for query in queries:
+        # Try Google Search
         try:
-            # Google Search
             google_results = await google_search(query, config=config, state=state)
             if google_results:
                 all_results.extend(google_results)
+        except Exception as e:
+            logger.error(f"Google search failed for query '{query}': {str(e)}")
             
-            # Tavily Search
+        # Try Tavily Search
+        try:
             tavily_results = await tavily_search(query, config=config, state=state)
             if tavily_results:
                 all_results.extend(tavily_results)
+        except Exception as e:
+            logger.error(f"Tavily search failed for query '{query}': {str(e)}")
             
-            # SerpAPI Search
+        # Try SerpAPI Search
+        try:
             serp_results = await serp_search(query, config=config, state=state)
             if serp_results:
                 all_results.extend(serp_results)
-                
         except Exception as e:
-            logger.error(f"Error searching for query '{query}': {str(e)}")
-            continue
+            logger.error(f"SerpAPI search failed for query '{query}': {str(e)}")
     
     if not all_results:
         logger.warning("No results found from any search provider")
         return None
-        
-    # Store raw results in state
-    if hasattr(state, 'raw_search_results'):
-        state.raw_search_results = all_results
     
     # Step 2: Remove duplicate URLs
     seen_urls = set()
@@ -72,18 +72,4 @@ async def combined_search(
     
     logger.info(f"Found {len(unique_results)} unique URLs from {len(all_results)} total results")
     
-    # Step 3: Apply Supabase URL filtering
-    try:
-        filtered_results = await filter_existing_urls(unique_results)
-        
-        if not filtered_results:
-            logger.warning("No results remained after URL filtering")
-            return None
-            
-        logger.info(f"Found {len(filtered_results)} results after URL filtering")
-        
-        return filtered_results
-        
-    except Exception as e:
-        logger.error(f"Error in URL filtering: {str(e)}")
-        return None
+    return unique_results
