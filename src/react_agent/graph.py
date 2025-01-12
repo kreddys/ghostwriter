@@ -38,23 +38,31 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             state=state
         )
         
-        # Clean up the queries - remove markdown formatting and parse JSON
-        if isinstance(search_queries, list) and search_queries:
-            # Remove markdown formatting artifacts
-            json_str = ' '.join(search_queries)
-            json_str = json_str.replace('```json', '').replace('```', '').strip()
-            
-            # Parse the JSON string to get actual queries
+        # Initialize clean_queries
+        clean_queries = []
+        
+        # Handle different response formats
+        if isinstance(search_queries, list):
             try:
-                import json
-                clean_queries = json.loads(json_str)
-                logger.info(f"Successfully parsed {len(clean_queries)} search queries")
-            except json.JSONDecodeError as e:
-                logger.error(f"Error parsing JSON queries: {str(e)}")
-                return state
+                # Case 1: Direct JSON list
+                if all(isinstance(q, str) for q in search_queries):
+                    clean_queries = search_queries
+                    logger.info("Successfully parsed direct JSON queries")
+                # Case 2: Markdown-formatted JSON
+                else:
+                    json_str = ' '.join(search_queries)
+                    json_str = json_str.replace('```json', '').replace('```', '').strip()
+                    import json
+                    clean_queries = json.loads(json_str)
+                    logger.info("Successfully parsed markdown JSON queries")
+                    
+            except (json.JSONDecodeError, Exception) as e:
+                logger.warning(f"Error parsing queries: {str(e)}. Using original query.")
+                clean_queries = [query]  # Fallback to original query
+                
         else:
-            logger.warning("No valid search queries generated")
-            return state
+            logger.warning("Invalid query format. Using original query.")
+            clean_queries = [query]  # Fallback to original query
             
         # Execute combined search with cleaned queries
         try:
@@ -69,15 +77,36 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                 
             logger.info(f"Retrieved {len(results)} results from combined search")
             
-            # Store in search_results for backward compatibility
             state.url_filtered_results[query.lower()] = results
             
         except Exception as e:
             logger.error(f"Error in combined search: {str(e)}")
+            # Try one more time with original query if combined search fails
+            try:
+                results = await combined_search(
+                    [query],
+                    config=config,
+                    state=state
+                )
+                if results:
+                    state.url_filtered_results[query.lower()] = results
+            except Exception as e2:
+                logger.error(f"Fallback search also failed: {str(e2)}")
             return state
             
     except Exception as e:
         logger.error(f"Error in process_search: {str(e)}")
+        # Try with original query as last resort
+        try:
+            results = await combined_search(
+                [query],
+                config=config,
+                state=state
+            )
+            if results:
+                state.url_filtered_results[query.lower()] = results
+        except Exception as e2:
+            logger.error(f"Final fallback search failed: {str(e2)}")
         
     return state
 
