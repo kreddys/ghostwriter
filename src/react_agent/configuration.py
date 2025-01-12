@@ -92,6 +92,14 @@ class Configuration:
         }
     )
 
+    use_search_enricher: bool = field(
+        default=False,
+        metadata={
+            "description": "Whether to use search enricher to find additional relevant content "
+            "or directly proceed to article writing with original results"
+        }
+    )
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None
