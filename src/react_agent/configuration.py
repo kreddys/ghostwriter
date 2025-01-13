@@ -29,7 +29,14 @@ class Configuration:
             "Should be in the form: provider/model-name."
         },
     )
-    
+
+    search_engines: list[str] = field(
+        default_factory=lambda: ["google", "tavily"], #["google", "tavily", "serp"]
+        metadata={
+            "description": "List of search engines to use. Options: 'google', 'tavily', 'serp'. "
+            "Empty list will use all available engines."
+        },
+    )
 
     max_search_results: int = field(
         default=10,
