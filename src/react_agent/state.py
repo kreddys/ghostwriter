@@ -60,3 +60,7 @@ class State(InputState):
     search_successful: bool = False
 
     topic: str = "Amaravati, Andhra Pradesh Capital City"  # Add this field for the configured topic
+
+    is_direct_url: bool = False  # Add this field to indicate direct URL processing
+
+    direct_url: str = ""  # Store the direct URL if provided

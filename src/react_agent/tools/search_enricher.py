@@ -86,6 +86,53 @@ async def generate_search_term(
         logger.error(f"Error generating search term: {str(e)}")
         return result.get('title', '')
 
+async def process_direct_url(
+    state: State,
+    result: Dict,
+    model,
+    pinecone_client: Pinecone,
+    config: RunnableConfig
+) -> Dict:
+    """Process a direct URL input for enrichment."""
+    logger.info(f"Processing direct URL: {result.get('url')}")
+    
+    try:
+        # Generate search term from the direct URL content
+        search_term = await generate_search_term(result, model)
+        
+        # Perform combined search with generated term
+        additional_results = await combined_search(
+            [search_term],
+            config=config,
+            state=state
+        )
+        
+        # Filter relevant results
+        relevant_results = []
+        if additional_results:
+            for additional_result in additional_results:
+                is_relevant = await check_relevance(
+                    original_result=result,
+                    additional_result=additional_result,
+                    pinecone_client=pinecone_client
+                )
+                
+                if is_relevant:
+                    relevant_results.append(additional_result)
+                    logger.info(f"Found relevant result for direct URL: '{additional_result.get('title')}'")
+        
+        return {
+            "original_result": result,
+            "additional_results": relevant_results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing direct URL: {str(e)}")
+        return {
+            "original_result": result,
+            "additional_results": []
+        }
+
 async def search_enricher(
     state: State,
     config: Annotated[RunnableConfig, InjectedToolArg()]
@@ -104,7 +151,33 @@ async def search_enricher(
         
         enriched_results = {}
         
-        # Process each unique result
+        # Handle direct URL case
+        if state.is_direct_url:
+            logger.info("Processing direct URL input")
+            direct_result = state.search_results.get(state.direct_url.lower(), [])[0]
+            
+            enriched_result = await process_direct_url(
+                state=state,
+                result=direct_result,
+                model=model,
+                pinecone_client=pinecone_client,
+                config=config
+            )
+            
+            if enriched_result["additional_results"]:
+                enriched_results[state.direct_url.lower()] = [enriched_result]
+                logger.info(f"Successfully enriched direct URL with {len(enriched_result['additional_results'])} results")
+            else:
+                logger.warning("No relevant additional results found for direct URL")
+                enriched_results[state.direct_url.lower()] = [{
+                    "original_result": direct_result,
+                    "additional_results": []
+                }]
+            
+            state.enriched_results = enriched_results
+            return state
+        
+        # Process regular search results
         for query, results in state.unique_results.items():
             if not isinstance(results, list):
                 continue
@@ -134,15 +207,9 @@ async def search_enricher(
                             
                             if is_relevant:
                                 relevant_results.append(additional_result)
-                                logger.info(
-                                    f"Found relevant result: "
-                                    f"'{additional_result.get('title')}'"
-                                )
+                                logger.info(f"Found relevant result: '{additional_result.get('title')}'")
                             else:
-                                logger.info(
-                                    f"Skipping irrelevant result: "
-                                    f"'{additional_result.get('title')}'"
-                                )
+                                logger.info(f"Skipping irrelevant result: '{additional_result.get('title')}'")
                     
                     # Only include results with relevant additional content
                     if relevant_results:
@@ -156,10 +223,7 @@ async def search_enricher(
                             f"with {len(relevant_results)} relevant results"
                         )
                     else:
-                        logger.warning(
-                            f"No relevant additional results found for: "
-                            f"{result.get('title')}"
-                        )
+                        logger.warning(f"No relevant additional results found for: {result.get('title')}")
                     
                 except Exception as e:
                     logger.error(f"Error enriching result: {str(e)}")
@@ -167,10 +231,7 @@ async def search_enricher(
             
             if enriched_query_results:
                 enriched_results[query] = enriched_query_results
-                logger.info(
-                    f"Stored {len(enriched_query_results)} enriched results "
-                    f"for query '{query}'"
-                )
+                logger.info(f"Stored {len(enriched_query_results)} enriched results for query '{query}'")
             else:
                 logger.warning(f"No enriched results found for query: {query}")
         

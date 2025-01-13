@@ -151,9 +151,24 @@ async def uniqueness_checker(
     logger.info("Starting uniqueness and relevancy check for search results")
     
     try:
-        # Initialize configuration and LLM model
-        configuration = Configuration.from_runnable_config(config)
+        # Check for direct URL input
+        if hasattr(state, 'is_direct_url') and state.is_direct_url:
+            logger.info("Direct URL detected - skipping uniqueness and relevancy checks")
+            
+            # Pass through the direct URL result without checks
+            if state.direct_url and state.direct_url.lower() in state.url_filtered_results:
+                state.unique_results = {
+                    state.direct_url.lower(): state.url_filtered_results[state.direct_url.lower()]
+                }
+                logger.info("Stored direct URL result without uniqueness/relevancy checks")
+                return state
+            else:
+                logger.warning("Direct URL results not found in filtered results")
+                state.unique_results = {}
+                return state
         
+        # Initialize configuration and LLM model for non-direct URL cases
+        configuration = Configuration.from_runnable_config(config)
         model = get_llm(configuration, temperature=0.3)
 
         # Initialize Pinecone and vector store
