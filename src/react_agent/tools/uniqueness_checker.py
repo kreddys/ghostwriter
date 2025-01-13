@@ -173,6 +173,7 @@ async def uniqueness_checker(
         
         # Initialize configuration and LLM model for non-direct URL cases
         configuration = Configuration.from_runnable_config(config)
+        use_url_filtering = configuration.use_url_filtering
         model = get_llm(configuration, temperature=0.3)
 
         # Initialize Pinecone and vector store
@@ -185,7 +186,12 @@ async def uniqueness_checker(
                 continue
                 
             # First step: Filter existing URLs
-            filtered_results = await filter_existing_urls(results)
+            if use_url_filtering:
+                logger.info("URL filtering enabled - filtering existing URLs")
+                filtered_results = await filter_existing_urls(results)
+            else:
+                logger.info("URL filtering disabled - proceeding with all results")
+                filtered_results = results
             
             # Second step: Check uniqueness and relevancy for remaining results
             source_unique_results = []

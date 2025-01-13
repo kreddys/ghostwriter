@@ -93,7 +93,7 @@ class Configuration:
     )
 
     use_url_filtering: bool = field(
-        default=False,
+        default=True,
         metadata={
             "description": "Whether to filter out URLs that already exist in Supabase"
         }
