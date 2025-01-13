@@ -9,6 +9,7 @@ from react_agent.agents.query_generator_agent import generate_queries
 from react_agent.tools.combined_search import combined_search
 from react_agent.utils.url_filter import filter_existing_urls
 from react_agent.configuration import Configuration
+from ..utils.firecrawl_client import scrape_url_content
 
 logger = logging.getLogger(__name__)
 
@@ -52,49 +53,43 @@ async def process_search(state: State, config: RunnableConfig) -> State:
     query = state.messages[0].content
     logger.info(f"Processing initial input: {query}")
     
-    # Check if input is a URL
+    # Handle direct URL input
     if is_valid_url(query):
         logger.info(f"Direct URL input detected: {query}")
         state.is_direct_url = True
         state.direct_url = query
         
-        # Create a direct URL result
-        direct_result = {
-            "url": query,
-            "title": "Direct URL Input",
-            "content": "Content from direct URL input",
-            "source": "direct_input"
-        }
+        direct_result = await scrape_url_content(query)
+        if direct_result:
+            state.search_results[query.lower()] = [direct_result]
+            state.url_filtered_results[query.lower()] = [direct_result]
+            state.search_successful = True
+            logger.info("Direct URL processing completed successfully")
+        else:
+            logger.error(f"Failed to scrape content from URL: {query}")
+            state.search_successful = False
+            logger.info("Direct URL processing failed")
         
-        # Store the result in state
-        state.search_results[query.lower()] = [direct_result]
-        state.url_filtered_results[query.lower()] = [direct_result]
-        state.search_successful = True
-        
-        logger.info("Direct URL processing completed")
         return state
-    
+
+    # Handle regular search queries
     try:
-        if use_query_generator and not state.is_direct_url:
+        # Generate search queries if enabled
+        if use_query_generator:
             logger.info("Using query generator")
-            # Generate multiple search queries using the function
             search_queries = await generate_queries(
                 query,
                 config=config,
                 state=state
             )
             
-            # Initialize clean_queries
             clean_queries = []
             
-            # Handle different response formats
             if isinstance(search_queries, list):
                 try:
-                    # Case 1: Direct JSON list
                     if all(isinstance(q, str) for q in search_queries):
                         clean_queries = search_queries
                         logger.info("Successfully parsed direct JSON queries")
-                    # Case 2: Markdown-formatted JSON
                     else:
                         json_str = ' '.join(search_queries)
                         json_str = json_str.replace('```json', '').replace('```', '').strip()
@@ -103,21 +98,23 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                         
                 except (json.JSONDecodeError, Exception) as e:
                     logger.warning(f"Error parsing queries: {str(e)}. Using original query.")
-                    clean_queries = [query]  # Fallback to original query
+                    clean_queries = [query]
                     
             else:
                 logger.warning("Invalid query format. Using original query.")
-                clean_queries = [query]  # Fallback to original query
+                clean_queries = [query]
         else:
-            logger.info("Query generator disabled or direct URL mode, using original query")
+            logger.info("Query generator disabled, using original query")
             clean_queries = [query]
             
+        # Perform search
         try:
             results = await combined_search(
                 clean_queries,
                 config=config, 
                 state=state
             )
+            
             if not results:
                 logger.warning("No results found from search queries")
                 state.search_successful = False
@@ -126,7 +123,8 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             state.search_results[query.lower()] = results
             logger.info(f"Retrieved {len(results)} results from combined search")
             
-            if use_url_filtering and not state.is_direct_url:
+            # Apply URL filtering if enabled
+            if use_url_filtering:
                 logger.info("Applying URL filtering")
                 filtered_results = await filter_existing_urls(
                     search_results=state.search_results[query.lower()],
@@ -135,18 +133,19 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                     logger.warning("No results after URL filtering")
                     state.search_successful = False
                     return state
+                    
                 state.url_filtered_results[query.lower()] = filtered_results
                 state.search_successful = True
                 logger.info(f"Stored {len(filtered_results)} filtered results")
             else:
-                logger.info("URL filtering disabled or direct URL mode, storing unfiltered results")
+                logger.info("URL filtering disabled, storing unfiltered results")
                 state.url_filtered_results[query.lower()] = results
                 state.search_successful = True
                 logger.info(f"Stored {len(results)} unfiltered results")
             
         except Exception as e:
             logger.error(f"Error in combined search: {str(e)}")
-            # Try one more time with original query if combined search fails
+            # Fallback to original query
             try:
                 results = await combined_search(
                     [query],
@@ -154,9 +153,9 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                     state=state
                 )
                 if results:
-                    if use_url_filtering and not state.is_direct_url:
+                    if use_url_filtering:
                         filtered_results = await filter_existing_urls(
-                            search_results=state.search_results[query.lower()],
+                            search_results=results,
                         )
                         if filtered_results:
                             state.url_filtered_results[query.lower()] = filtered_results
@@ -171,11 +170,10 @@ async def process_search(state: State, config: RunnableConfig) -> State:
             except Exception as e2:
                 logger.error(f"Fallback search also failed: {str(e2)}")
                 state.search_successful = False
-            return state
             
     except Exception as e:
         logger.error(f"Error in process_search: {str(e)}")
-        # Try with original query as last resort
+        # Final fallback attempt
         try:
             results = await combined_search(
                 [query],
@@ -183,9 +181,9 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                 state=state
             )
             if results:
-                if use_url_filtering and not state.is_direct_url:
+                if use_url_filtering:
                     filtered_results = await filter_existing_urls(
-                        search_results=state.search_results[query.lower()],
+                        search_results=results,
                     )
                     if filtered_results:
                         state.url_filtered_results[query.lower()] = filtered_results
