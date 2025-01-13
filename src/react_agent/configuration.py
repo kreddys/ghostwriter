@@ -31,7 +31,7 @@ class Configuration:
     )
 
     search_engines: list[str] = field(
-        default_factory=lambda: ["google", "tavily"], #["google", "tavily", "serp"]
+        default_factory=lambda: ["tavily"], #["google", "tavily", "serp"]
         metadata={
             "description": "List of search engines to use. Options: 'google', 'tavily', 'serp'. "
             "Empty list will use all available engines."
@@ -88,12 +88,12 @@ class Configuration:
     )
 
     use_query_generator: bool = field(
-        default=False,
+        default=True,
         metadata={"help": "Whether to use query generator or direct search with user input"}
     )
 
     use_url_filtering: bool = field(
-        default=False,
+        default=True,
         metadata={
             "description": "Whether to filter out URLs that already exist in Supabase"
         }

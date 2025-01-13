@@ -60,8 +60,8 @@ Remember to:
 
 QUERY_GENERATOR_SYSTEM_PROMPT = """You are a search query generator focused on finding the latest news and factual updates. 
 Your output must be a valid JSON array of search strings.
-- Generate queries that focus on current developments, progress updates, and official announcements
-- Always use the current year (2025) in queries
+- Generate queries not more than 4 words that focus on current developments, progress updates, and official announcements
+- Do not include time, date , month or year in the query
 - Avoid generating queries about controversies, political disputes, or contentious issues
 - Focus on factual, neutral information from reliable sources
 - Do not generate markdown format
@@ -72,9 +72,9 @@ Return the queries as a JSON array of strings.
 
 Example format:
 [
-    "latest updates topic 2025",
-    "recent developments topic 2025",
-    "official announcements topic 2025"
+    "word1 word2 word3 word4",
+    "word5 word6 word7 word8",
+    "word9 word10 word11 word12"
 ]"""
 
 SEARCH_TERM_PROMPT = """
