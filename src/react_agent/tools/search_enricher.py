@@ -35,22 +35,18 @@ async def check_relevance(
         logger.info(f"Original URL: {original_url}")
         logger.info(f"Additional URL: {additional_url}")
 
-        # Prepare texts for embedding
         original_text = f"{original_result.get('title', '')}. {original_result.get('content', '')}"
         additional_text = f"{additional_result.get('title', '')}. {additional_result.get('content', '')}"
         
-        # Generate embeddings
         embeddings = pinecone_client.inference.embed(
             model="multilingual-e5-large",
             inputs=[original_text, additional_text],
             parameters={"input_type": "passage", "truncate": "END"}
         )
         
-        # Extract embedding vectors
         vec1 = np.array(embeddings.data[0].values)
         vec2 = np.array(embeddings.data[1].values)
         
-        # Calculate similarity
         similarity = cosine_similarity(vec1, vec2)
         is_relevant = similarity >= similarity_threshold
         
@@ -96,18 +92,23 @@ async def process_direct_url(
     """Process a direct URL input for enrichment."""
     logger.info(f"Processing direct URL: {result.get('url')}")
     
+    # Skip enrichment if Firecrawl was successful
+    if result.get('scrape_status') == 'success':
+        logger.info(f"Skipping enrichment for direct URL - Firecrawl successful")
+        return {
+            "original_result": result,
+            "additional_results": []
+        }
+    
     try:
-        # Generate search term from the direct URL content
         search_term = await generate_search_term(result, model)
         
-        # Perform combined search with generated term
         additional_results = await combined_search(
             [search_term],
             config=config,
             state=state
         )
         
-        # Filter relevant results
         relevant_results = []
         if additional_results:
             for additional_result in additional_results:
@@ -142,11 +143,7 @@ async def search_enricher(
     
     try:
         configuration = Configuration.from_runnable_config(config)
-        
-        # Initialize Pinecone client
         pinecone_client = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-        
-        # Initialize the model using centralized LLM initialization
         model = get_llm(configuration, temperature=0.7)
         
         enriched_results = {}
@@ -185,17 +182,19 @@ async def search_enricher(
             enriched_query_results = []
             for result in results:
                 try:
-                    # Generate search term from result
+                    # Skip enrichment if Firecrawl was successful
+                    if result.get('scrape_status') == 'success':
+                        logger.info(f"Skipping enrichment for '{result.get('title')}' - Firecrawl successful")
+                        continue
+                    
                     search_term = await generate_search_term(result, model)
                     
-                    # Perform combined search with generated term
                     additional_results = await combined_search(
                         [search_term],
                         config=config,
                         state=state
                     )
                     
-                    # Filter relevant results
                     relevant_results = []
                     if additional_results:
                         for additional_result in additional_results:
@@ -211,7 +210,6 @@ async def search_enricher(
                             else:
                                 logger.info(f"Skipping irrelevant result: '{additional_result.get('title')}'")
                     
-                    # Only include results with relevant additional content
                     if relevant_results:
                         enriched_result = {
                             "original_result": result,
@@ -240,7 +238,6 @@ async def search_enricher(
             state.search_successful = False
             return state
         
-        # Store enriched results in state
         state.enriched_results = enriched_results
         logger.info("Enrichment complete")
         

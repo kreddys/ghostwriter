@@ -39,6 +39,7 @@ async def update_with_firecrawl(results: List[Dict[str, Any]]) -> List[Dict[str,
     for result in results:
         url = result.get('url')
         if not url:
+            result['scrape_status'] = 'failure'
             updated_results.append(result)
             continue
             
@@ -53,14 +54,17 @@ async def update_with_firecrawl(results: List[Dict[str, Any]]) -> List[Dict[str,
                     'metadata': {
                         **(result.get('metadata', {})),
                         **(firecrawl_data.get('metadata', {}))
-                    }
+                    },
+                    'scrape_status': 'success'
                 }
                 logger.info(f"Successfully updated result with Firecrawl data for URL: {url}")
                 updated_results.append(merged_result)
             else:
+                result['scrape_status'] = 'failure'
                 logger.warning(f"Firecrawl failed for URL: {url}, keeping original data")
                 updated_results.append(result)
         except Exception as e:
+            result['scrape_status'] = 'failure'
             logger.error(f"Error updating result with Firecrawl for URL {url}: {str(e)}")
             updated_results.append(result)
             
@@ -127,5 +131,7 @@ async def combined_search(
         logger.info(f"Successfully updated {len(final_results)} results with Firecrawl")
         return final_results
     except Exception as e:
+        for result in unique_results:
+            result['scrape_status'] = 'failure'
         logger.error(f"Error during Firecrawl update: {str(e)}")
         return unique_results  # Return unique results without Firecrawl updates if it fails
