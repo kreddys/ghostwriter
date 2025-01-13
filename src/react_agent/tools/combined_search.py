@@ -70,5 +70,6 @@ async def combined_search(
             seen_urls.add(url)
     
     logger.info(f"Found {len(unique_results)} unique URLs from {len(all_results)} total results")
+    logger.info(f"All combined URLs: {[result.get('url') for result in all_results]}")
     
     return unique_results

@@ -24,13 +24,20 @@ async def check_relevance(
     original_result: Dict,
     additional_result: Dict,
     pinecone_client: Pinecone,
-    similarity_threshold: float = 0.75
+    similarity_threshold: float = 0.90
 ) -> bool:
     """Check if an additional result is relevant to the original result using Pinecone embeddings."""
     try:
+        original_url = original_result.get('url', 'No URL')
+        additional_url = additional_result.get('url', 'No URL')
+        
+        logger.info(f"Checking relevance between:")
+        logger.info(f"Original URL: {original_url}")
+        logger.info(f"Additional URL: {additional_url}")
+
         # Prepare texts for embedding
         original_text = f"{original_result.get('title', '')}. {original_result.get('content', '')}"
-        additional_text = f"{additional_result.get('title', '')}. {additional_result.get('snippet', '')}"
+        additional_text = f"{additional_result.get('title', '')}. {additional_result.get('content', '')}"
         
         # Generate embeddings
         embeddings = pinecone_client.inference.embed(
