@@ -6,6 +6,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
 from langchain_core.messages import SystemMessage
 from langchain_pinecone import PineconeEmbeddings, PineconeVectorStore
+from langchain.text_splitter import TokenTextSplitter
 from pinecone import Pinecone
 from supabase import create_client, Client
 from ..state import State
@@ -106,45 +107,68 @@ def check_result_uniqueness(
     vector_store: PineconeVectorStore,
     similarity_threshold: float = 0.85
 ) -> bool:
-    """Check if a search result is unique against Pinecone database."""
+    """
+    Check if a search result is unique against Pinecone database by splitting content 
+    into chunks and checking each chunk for uniqueness.
+    """
     logger.info(f"Checking uniqueness for result: {result.get('title', 'No title')}")
     logger.debug(f"Full result object: {result}")
 
-    if not result.get('title') and not result.get('content'):
-        logger.warning("Result missing both title and content")
+    # Check if content exists
+    if not result.get('content'):
+        logger.warning("Result missing content")
         return False
-        
-    content = f"Title: {result.get('title', '')}\nContent: {result.get('content', '')}"
-    logger.debug(f"Generated content for similarity search: {content[:200]}...")
+
+    # Initialize text splitter for 500 token chunks
+    text_splitter = TokenTextSplitter(
+        chunk_size=500,
+        chunk_overlap=50  # Some overlap to maintain context
+    )
     
     try:
-        similar_results = vector_store.similarity_search_with_score(
-            content,
-            k=1,
-        )
-        
-        logger.info(f"Number of similar results found: {len(similar_results)}")
-        
-        if similar_results:
-            logger.info("Similar documents found:")
-            for doc, score in similar_results:
-                logger.info(f"Similarity score: {score}")
-                logger.info(f"Document content: {doc.page_content[:200]}...")
-                logger.info(f"Document metadata: {doc.metadata}")
+        # Split content into chunks
+        content = result.get('content', '')
+        content_chunks = text_splitter.split_text(content)
+        logger.info(f"Split content into {len(content_chunks)} chunks")
+
+        # Check each chunk for uniqueness
+        for i, chunk in enumerate(content_chunks):
+            logger.debug(f"Checking chunk {i+1}/{len(content_chunks)}")
+            logger.debug(f"Chunk content: {chunk[:200]}...")
+
+            similar_results = vector_store.similarity_search_with_score(
+                chunk,
+                k=1,
+            )
+
+            logger.info(f"Number of similar results found for chunk {i+1}: {len(similar_results)}")
+
+            if similar_results:
+                logger.info(f"Similar documents found for chunk {i+1}:")
+                for doc, score in similar_results:
+                    logger.info(f"Similarity score: {score}")
+                    logger.info(f"Document content: {doc.page_content[:200]}...")
+                    logger.info(f"Document metadata: {doc.metadata}")
+
+                most_similar_doc, similarity_score = similar_results[0]
                 
-            most_similar_doc, similarity_score = similar_results[0]
-            is_unique = similarity_score <= similarity_threshold
-            logger.info(f"Most similar document score: {similarity_score}")
-            logger.info(f"Is unique (score {similarity_score} <= threshold {similarity_threshold}): {is_unique}")
-            return is_unique
-        else:
-            logger.info("No similar documents found - result is unique")
-            return True
-            
+                # If any chunk is unique (score above threshold), the content is considered unique
+                if similarity_score <= similarity_threshold:
+                    logger.info(f"Found unique chunk {i+1} (score {similarity_score} <= threshold {similarity_threshold})")
+                    return True
+            else:
+                # If no similar documents found for any chunk, it's unique
+                logger.info(f"No similar documents found for chunk {i+1} - chunk is unique")
+                return True
+
+        # If we get here, no chunks were unique
+        logger.info("No unique chunks found - content is not unique")
+        return False
+
     except Exception as e:
         logger.error(f"Error during similarity search: {str(e)}", exc_info=True)
         logger.error(f"Vector store type: {type(vector_store)}")
-        logger.error(f"Content length: {len(content)}")
+        logger.error(f"Content length: {len(result.get('content', ''))}")
         return False
 
 async def uniqueness_checker(
