@@ -7,7 +7,6 @@ from langchain_core.runnables import RunnableConfig
 from react_agent.state import State
 from react_agent.agents.query_generator_agent import generate_queries
 from react_agent.tools.combined_search import combined_search
-from react_agent.utils.url_filter import filter_existing_urls
 from react_agent.configuration import Configuration
 from ..utils.firecrawl_client import scrape_url_content
 
@@ -31,7 +30,6 @@ async def process_search(state: State, config: RunnableConfig) -> State:
     # Get configuration properly using Configuration class
     configuration = Configuration.from_runnable_config(config)
     use_query_generator = configuration.use_query_generator
-    use_url_filtering = configuration.use_url_filtering
     
     # Initialize state attributes
     if not hasattr(state, 'search_results'):
@@ -121,27 +119,9 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                 return state
             
             state.search_results[query.lower()] = results
-            logger.info(f"Retrieved {len(results)} results from combined search")
-            
-            # Apply URL filtering if enabled
-            if use_url_filtering:
-                logger.info("Applying URL filtering")
-                filtered_results = await filter_existing_urls(
-                    search_results=state.search_results[query.lower()],
-                )
-                if not filtered_results:
-                    logger.warning("No results after URL filtering")
-                    state.search_successful = False
-                    return state
-                    
-                state.url_filtered_results[query.lower()] = filtered_results
-                state.search_successful = True
-                logger.info(f"Stored {len(filtered_results)} filtered results")
-            else:
-                logger.info("URL filtering disabled, storing unfiltered results")
-                state.url_filtered_results[query.lower()] = results
-                state.search_successful = True
-                logger.info(f"Stored {len(results)} unfiltered results")
+            state.url_filtered_results[query.lower()] = results
+            state.search_successful = True
+            logger.info(f"Retrieved and stored {len(results)} results from combined search")
             
         except Exception as e:
             logger.error(f"Error in combined search: {str(e)}")
@@ -153,18 +133,8 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                     state=state
                 )
                 if results:
-                    if use_url_filtering:
-                        filtered_results = await filter_existing_urls(
-                            search_results=results,
-                        )
-                        if filtered_results:
-                            state.url_filtered_results[query.lower()] = filtered_results
-                            state.search_successful = True
-                        else:
-                            state.search_successful = False
-                    else:
-                        state.url_filtered_results[query.lower()] = results
-                        state.search_successful = True
+                    state.url_filtered_results[query.lower()] = results
+                    state.search_successful = True
                 else:
                     state.search_successful = False
             except Exception as e2:
@@ -181,18 +151,8 @@ async def process_search(state: State, config: RunnableConfig) -> State:
                 state=state
             )
             if results:
-                if use_url_filtering:
-                    filtered_results = await filter_existing_urls(
-                        search_results=results,
-                    )
-                    if filtered_results:
-                        state.url_filtered_results[query.lower()] = filtered_results
-                        state.search_successful = True
-                    else:
-                        state.search_successful = False
-                else:
-                    state.url_filtered_results[query.lower()] = results
-                    state.search_successful = True
+                state.url_filtered_results[query.lower()] = results
+                state.search_successful = True
             else:
                 state.search_successful = False
         except Exception as e2:

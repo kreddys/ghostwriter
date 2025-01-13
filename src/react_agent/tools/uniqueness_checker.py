@@ -7,11 +7,15 @@ from langchain_core.tools import InjectedToolArg
 from langchain_core.messages import SystemMessage
 from langchain_pinecone import PineconeEmbeddings, PineconeVectorStore
 from pinecone import Pinecone
+from supabase import create_client, Client
 from ..state import State
 from ..utils.ghost_api import fetch_ghost_articles
 from ..configuration import Configuration
 from ..prompts import RELEVANCY_CHECK_PROMPT 
 from ..llm import get_llm
+from ..utils.url_filter import filter_existing_urls
+
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -180,9 +184,13 @@ async def uniqueness_checker(
             if not isinstance(results, list):
                 continue
                 
+            # First step: Filter existing URLs
+            filtered_results = await filter_existing_urls(results)
+            
+            # Second step: Check uniqueness and relevancy for remaining results
             source_unique_results = []
-            for result in results:
-                # Check uniqueness first
+            for result in filtered_results:
+                # Check uniqueness
                 if check_result_uniqueness(result, vector_store):
                     # Then check relevancy
                     is_relevant = await check_content_relevancy(result, state.topic, model)
