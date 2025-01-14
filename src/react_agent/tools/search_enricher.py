@@ -24,9 +24,12 @@ async def check_relevance(
     original_result: Dict,
     additional_result: Dict,
     pinecone_client: Pinecone,
-    similarity_threshold: float = 0.90
+    configuration: Configuration
 ) -> bool:
     """Check if an additional result is relevant to the original result using Pinecone embeddings."""
+
+    similarity_threshold = configuration.relevance_similarity_threshold
+
     try:
         original_url = original_result.get('url', 'No URL')
         additional_url = additional_result.get('url', 'No URL')

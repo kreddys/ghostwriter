@@ -107,6 +107,22 @@ class Configuration:
         }
     )
 
+    similarity_threshold: float = field(
+        default=0.85,
+        metadata={
+            "description": "Threshold for determining content uniqueness using cosine similarity. "
+            "Lower values are more strict (require more uniqueness)."
+        },
+    )
+
+    relevance_similarity_threshold: float = field(
+        default=0.90,
+        metadata={
+            "description": "Threshold for determining content relevance using cosine similarity. "
+            "Higher values are more strict (require more similarity)."
+        },
+    )
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None

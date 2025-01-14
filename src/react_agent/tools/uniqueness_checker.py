@@ -18,8 +18,6 @@ from ..utils.url_filter import filter_existing_urls
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
-
 async def init_pinecone_with_ghost_articles():
     """Initialize Pinecone client and index, and populate with Ghost articles."""
     if not os.getenv("PINECONE_API_KEY"):
@@ -28,18 +26,16 @@ async def init_pinecone_with_ghost_articles():
     pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
     index_name = os.getenv("PINECONE_INDEX_NAME")
     
-    # Get existing index
+    logger.info(f"Initializing Pinecone with index: {index_name}")
+    
     existing_indexes = [index_info["name"] for index_info in pc.list_indexes()]
     if index_name not in existing_indexes:
         raise ValueError(f"Index {index_name} does not exist in Pinecone")
     
     index = pc.Index(index_name)
-    
-    # Initialize vector store with embeddings
     embeddings = PineconeEmbeddings(model="multilingual-e5-large")
     vector_store = PineconeVectorStore(index=index, embedding=embeddings)
     
-    # Fetch Ghost articles
     try:
         ghost_url = os.getenv("GHOST_APP_URL")
         ghost_api_key = os.getenv("GHOST_API_KEY")
@@ -51,7 +47,6 @@ async def init_pinecone_with_ghost_articles():
         articles = await fetch_ghost_articles(ghost_url, ghost_api_key)
         logger.info(f"Fetched {len(articles)} articles from Ghost")
         
-        # Store articles in vector store
         for article in articles:
             try:
                 content = f"Title: {article.title}\nContent: {article.content}"
@@ -82,12 +77,19 @@ async def init_pinecone_with_ghost_articles():
 
 async def check_content_relevancy(content: dict, topic: str, model) -> bool:
     """Check if content is relevant to the specified topic using LLM."""
+    url = content.get('url', 'No URL')
+    title = content.get('title', 'No title')
+    
+    logger.info(f"Checking relevancy for URL: {url}")
+    logger.info(f"Title: {title}")
+    logger.info(f"Topic: {topic}")
+    
     try:
         messages = [
             SystemMessage(
                 content=RELEVANCY_CHECK_PROMPT.format(
                     topic=topic,
-                    title=content.get('title', 'N/A'),
+                    title=title,
                     content=content.get('content', 'N/A')
                 )
             )
@@ -95,80 +97,63 @@ async def check_content_relevancy(content: dict, topic: str, model) -> bool:
         
         response = await model.ainvoke(messages)
         is_relevant = response.content.lower().startswith('relevant')
-        logger.info(f"Relevancy check for '{content.get('title')}': {is_relevant}")
+        
+        logger.info(f"Relevancy check result for {url}: {'RELEVANT' if is_relevant else 'NOT RELEVANT'}")
         return is_relevant
         
     except Exception as e:
-        logger.error(f"Error in relevancy check: {str(e)}")
+        logger.error(f"Error in relevancy check for {url}: {str(e)}")
         return False
 
 def check_result_uniqueness(
     result: Dict, 
     vector_store: PineconeVectorStore,
-    similarity_threshold: float = 0.85
+    configuration: Configuration
 ) -> bool:
-    """
-    Check if a search result is unique against Pinecone database by splitting content 
-    into chunks and checking each chunk for uniqueness.
-    """
-    logger.info(f"Checking uniqueness for result: {result.get('title', 'No title')}")
+    """Check if a search result is unique against Pinecone database."""
+    url = result.get('url', 'No URL')
+    title = result.get('title', 'No title')
+
+    similarity_threshold = configuration.similarity_threshold
+
+    logger.info(f"=== Checking uniqueness for URL: {url} ===")
+    logger.info(f"Using similarity threshold: {similarity_threshold}")
+    logger.info(f"Title: {title}")
     logger.debug(f"Full result object: {result}")
 
-    # Check if content exists
     if not result.get('content'):
-        logger.warning("Result missing content")
+        logger.warning(f"Result missing content for URL: {url}")
         return False
 
-    # Initialize text splitter for 500 token chunks
-    text_splitter = TokenTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50  # Some overlap to maintain context
-    )
+    text_splitter = TokenTextSplitter(chunk_size=500, chunk_overlap=50)
     
     try:
-        # Split content into chunks
         content = result.get('content', '')
         content_chunks = text_splitter.split_text(content)
-        logger.info(f"Split content into {len(content_chunks)} chunks")
+        logger.info(f"Split content into {len(content_chunks)} chunks for {url}")
 
-        # Check each chunk for uniqueness
         for i, chunk in enumerate(content_chunks):
-            logger.debug(f"Checking chunk {i+1}/{len(content_chunks)}")
-            logger.debug(f"Chunk content: {chunk[:200]}...")
-
-            similar_results = vector_store.similarity_search_with_score(
-                chunk,
-                k=1,
-            )
-
-            logger.info(f"Number of similar results found for chunk {i+1}: {len(similar_results)}")
-
+            logger.debug(f"Checking chunk {i+1}/{len(content_chunks)} for {url}")
+            
+            similar_results = vector_store.similarity_search_with_score(chunk, k=1)
+            
             if similar_results:
-                logger.info(f"Similar documents found for chunk {i+1}:")
-                for doc, score in similar_results:
-                    logger.info(f"Similarity score: {score}")
-                    logger.info(f"Document content: {doc.page_content[:200]}...")
-                    logger.info(f"Document metadata: {doc.metadata}")
-
                 most_similar_doc, similarity_score = similar_results[0]
+                logger.info(f"Chunk {i+1} similarity score: {similarity_score}")
+                logger.info(f"Similar document URL: {most_similar_doc.metadata.get('url', 'No URL')}")
                 
-                # If any chunk is unique (score above threshold), the content is considered unique
                 if similarity_score <= similarity_threshold:
-                    logger.info(f"Found unique chunk {i+1} (score {similarity_score} <= threshold {similarity_threshold})")
+                    logger.info(f"Found unique chunk for {url} (score: {similarity_score})")
                     return True
             else:
-                # If no similar documents found for any chunk, it's unique
-                logger.info(f"No similar documents found for chunk {i+1} - chunk is unique")
+                logger.info(f"No similar documents found for chunk {i+1} of {url}")
                 return True
 
-        # If we get here, no chunks were unique
-        logger.info("No unique chunks found - content is not unique")
+        logger.info(f"Content not unique for {url}")
         return False
 
     except Exception as e:
-        logger.error(f"Error during similarity search: {str(e)}", exc_info=True)
-        logger.error(f"Vector store type: {type(vector_store)}")
-        logger.error(f"Content length: {len(result.get('content', ''))}")
+        logger.error(f"Error checking uniqueness for {url}: {str(e)}", exc_info=True)
         return False
 
 async def uniqueness_checker(
@@ -176,68 +161,78 @@ async def uniqueness_checker(
     config: Annotated[RunnableConfig, InjectedToolArg()]
 ) -> State:
     """Filter and return unique search results using Pinecone and check topic relevancy."""
-    logger.info("Starting uniqueness and relevancy check for search results")
+    logger.info("=== Starting uniqueness and relevancy check for search results ===")
+    logger.info(f"Initial number of URLs to process: {sum(len(results) if isinstance(results, list) else 0 for results in state.url_filtered_results.values())}")
     
     try:
-        # Check for direct URL input
         if hasattr(state, 'is_direct_url') and state.is_direct_url:
             logger.info("Direct URL detected - skipping uniqueness and relevancy checks")
-            
-            # Pass through the direct URL result without checks
             if state.direct_url and state.direct_url.lower() in state.url_filtered_results:
                 state.unique_results = {
                     state.direct_url.lower(): state.url_filtered_results[state.direct_url.lower()]
                 }
-                logger.info("Stored direct URL result without uniqueness/relevancy checks")
+                logger.info(f"Stored direct URL result: {state.direct_url}")
                 return state
             else:
                 logger.warning("Direct URL results not found in filtered results")
                 state.unique_results = {}
                 return state
         
-        # Initialize configuration and LLM model for non-direct URL cases
         configuration = Configuration.from_runnable_config(config)
         use_url_filtering = configuration.use_url_filtering
         model = get_llm(configuration, temperature=0.3)
-
-        # Initialize Pinecone and vector store
         vector_store = await init_pinecone_with_ghost_articles()
         
         unique_results = {}
+        total_processed = 0
+        total_unique = 0
+        total_relevant = 0
         
         for query, results in state.url_filtered_results.items():
             if not isinstance(results, list):
                 continue
                 
-            # First step: Filter existing URLs
-            if use_url_filtering:
-                logger.info("URL filtering enabled - filtering existing URLs")
-                filtered_results = await filter_existing_urls(results)
-            else:
-                logger.info("URL filtering disabled - proceeding with all results")
-                filtered_results = results
+            logger.info(f"\nProcessing query: {query}")
+            logger.info(f"Number of results to process: {len(results)}")
             
-            # Second step: Check uniqueness and relevancy for remaining results
+            if use_url_filtering:
+                filtered_results = await filter_existing_urls(results)
+                logger.info(f"URLs after filtering: {len(filtered_results)} (filtered out {len(results) - len(filtered_results)})")
+            else:
+                filtered_results = results
+                logger.info("URL filtering disabled - processing all results")
+            
             source_unique_results = []
+            
             for result in filtered_results:
+                total_processed += 1
+                url = result.get('url', 'No URL')
+                
                 # Check uniqueness
-                if check_result_uniqueness(result, vector_store):
-                    # Then check relevancy
+                is_unique = check_result_uniqueness(result, vector_store)
+                if is_unique:
+                    total_unique += 1
+                    # Check relevancy
                     is_relevant = await check_content_relevancy(result, state.topic, model)
                     if is_relevant:
+                        total_relevant += 1
                         source_unique_results.append(result)
-                        logger.info(f"Found unique and relevant result from {query}: {result.get('title', '')}")
+                        logger.info(f"✓ Accepted URL (unique and relevant): {url}")
                     else:
-                        logger.info(f"Skipped irrelevant result from {query}: {result.get('title', '')}")
+                        logger.info(f"✗ Rejected URL (not relevant): {url}")
                 else:
-                    logger.info(f"Skipped duplicate result from {query}: {result.get('title', '')}")
+                    logger.info(f"✗ Rejected URL (not unique): {url}")
             
             if source_unique_results:
                 unique_results[query] = source_unique_results
         
-        # Store unique results in state
         state.unique_results = unique_results
-        logger.info(f"Stored {sum(len(results) for results in unique_results.values())} unique and relevant results in state")
+        
+        logger.info("\n=== Uniqueness Checker Summary ===")
+        logger.info(f"Total URLs processed: {total_processed}")
+        logger.info(f"Unique URLs found: {total_unique}")
+        logger.info(f"Relevant URLs found: {total_relevant}")
+        logger.info(f"Final unique and relevant URLs: {sum(len(results) for results in unique_results.values())}")
 
         return state
         
