@@ -39,7 +39,7 @@ class Configuration:
     )
 
     max_search_results: int = field(
-        default=10,
+        default=2,
         metadata={
             "description": "The maximum number of search results to return for each search query."
         },
@@ -73,27 +73,13 @@ class Configuration:
         }
     )
 
-    ghost_cms_url: str = field(
-        default="",
-        metadata={
-            "description": "The base URL for the Ghost CMS API. Required for fetching tags and publishing articles."
-        },
-    )
-
-    ghost_api_key: str = field(
-        default="",
-        metadata={
-            "description": "The API key for accessing the Ghost CMS Content API."
-        },
-    )
-
     use_query_generator: bool = field(
         default=False,
         metadata={"help": "Whether to use query generator or direct search with user input"}
     )
 
     use_url_filtering: bool = field(
-        default=True,
+        default=False,
         metadata={
             "description": "Whether to filter out URLs that already exist in Supabase"
         }
@@ -108,9 +94,9 @@ class Configuration:
     )
 
     similarity_threshold: float = field(
-        default=0.85,
+        default=0.80,
         metadata={
-            "description": "Threshold for determining content uniqueness using cosine similarity. "
+            "description": "Threshold for determining content uniqueness using cosine similarity. Used to check existing posts in Ghost & suppress similar posts. "
             "Lower values are more strict (require more uniqueness)."
         },
     )

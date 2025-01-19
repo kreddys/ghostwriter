@@ -209,7 +209,7 @@ async def uniqueness_checker(
                 url = result.get('url', 'No URL')
                 
                 # Check uniqueness
-                is_unique = check_result_uniqueness(result, vector_store)
+                is_unique = check_result_uniqueness(result, vector_store, configuration)
                 if is_unique:
                     total_unique += 1
                     # Check relevancy
