@@ -92,10 +92,11 @@ async def create_thread(request: ThreadCreateRequest):
 
 @app.post("/runs")
 async def create_run(request: RunCreateRequest):
+    """Create and stream a new run for a thread."""
     try:
         # Prepare the request body according to LangGraph API requirements
         request_body = {
-            "thread_id": request.thread_id,  # Add thread_id to the request
+            "thread_id": request.thread_id,
             "assistant_id": request.assistant_id,
             "input": request.input,
             "config": {
@@ -106,8 +107,7 @@ async def create_run(request: RunCreateRequest):
                 "on_disconnect": request.on_disconnect
             },
             "metadata": request.metadata,
-            "tags": request.tags,
-            #"webhook": request.webhook
+            "tags": request.tags
         }
         
         logger.info(f"Sending request to LangGraph API: {request_body}")
@@ -128,67 +128,32 @@ async def create_run(request: RunCreateRequest):
                     logger.debug(f"Stream headers: {response.headers}")
                     logger.debug(f"Stream status: {response.status_code}")
 
-                    # Initialize last activity time
-                    last_activity = datetime.now()
-                    keepalive_interval = 5  # seconds
-                    max_idle_time = 30  # seconds
-                    
-                    while True:
-                        try:
-                            async for chunk in response.aiter_text():
-                                if chunk.strip():  # Only yield non-empty chunks
-                                    logger.debug(f"Received chunk: {chunk}")
-                                    yield chunk
-                                    last_activity = datetime.now()
-                                else:
-                                    # Check if connection has been idle too long
-                                    idle_time = (datetime.now() - last_activity).total_seconds()
-                                    if idle_time > max_idle_time:
-                                        logger.warning(f"Connection idle for {idle_time} seconds, closing")
-                                        break
-                                    
-                                    # Send keep-alive message
-                                    keepalive_msg = json.dumps({
-                                        "status": "keepalive",
-                                        "timestamp": str(datetime.now())
-                                    }) + "\n"
-                                    logger.debug(f"Sending keep-alive: {keepalive_msg.strip()}")
-                                    yield keepalive_msg
-                                    await asyncio.sleep(keepalive_interval)
+                    async for chunk in response.aiter_text():
+                        if chunk.strip():  # Only yield non-empty chunks
+                            logger.debug(f"Received chunk: {chunk}")
+                            yield chunk
+
+                except httpx.StreamClosed as e:
+                    logger.warning(f"Stream closed by client - connection terminated. Details: {str(e)}")
+                    logger.debug(f"Response status: {response.status_code}")
+                    logger.debug(f"Response headers: {response.headers}")
+                    closed_msg = json.dumps({
+                        "status": "stream_closed",
+                        "message": "Client disconnected",
+                        "timestamp": str(datetime.now())
+                    })
+                    logger.debug(f"Sending stream closed: {closed_msg}")
+                    yield closed_msg
                             
-                            # If we get here, the stream completed normally
-                            logger.info("Stream completed successfully")
-                            completion_msg = json.dumps({
-                                "status": "complete",
-                                "message": "Stream completed"
-                            })
-                            logger.debug(f"Sending completion: {completion_msg}")
-                            yield completion_msg
-                            break
-                            
-                        except httpx.StreamClosed as e:
-                            logger.warning(f"Stream closed by client - connection terminated. Details: {str(e)}")
-                            logger.debug(f"Response status: {response.status_code}")
-                            logger.debug(f"Response headers: {response.headers}")
-                            closed_msg = json.dumps({
-                                "status": "stream_closed",
-                                "message": "Client disconnected",
-                                "timestamp": str(datetime.now())
-                            })
-                            logger.debug(f"Sending stream closed: {closed_msg}")
-                            yield closed_msg
-                            break
-                            
-                        except Exception as e:
-                            logger.error(f"Stream error: {str(e)}", exc_info=True)
-                            error_msg = json.dumps({
-                                "status": "error",
-                                "message": str(e),
-                                "timestamp": str(datetime.now())
-                            })
-                            logger.debug(f"Sending error: {error_msg}")
-                            yield error_msg
-                            break
+                except Exception as e:
+                    logger.error(f"Stream error: {str(e)}", exc_info=True)
+                    error_msg = json.dumps({
+                        "status": "error",
+                        "message": str(e),
+                        "timestamp": str(datetime.now())
+                    })
+                    logger.debug(f"Sending error: {error_msg}")
+                    yield error_msg
                             
                 finally:
                     try:
@@ -200,13 +165,11 @@ async def create_run(request: RunCreateRequest):
             
             return StreamingResponse(
                 generate(),
-                media_type="application/json",
+                media_type="text/event-stream",
                 headers={
                     "X-Accel-Buffering": "no",  # Disable buffering for nginx
-                    "Cache-Control": "no-cache",
+                    "Cache-Control": "no-store",
                     "Connection": "keep-alive",
-                    "Content-Type": "text/event-stream",
-                    "Transfer-Encoding": "chunked"
                 }
             )
             
