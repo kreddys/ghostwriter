@@ -24,6 +24,7 @@ dependencies = [
     "pinecone-client>=3.0.0",
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
+    "streamlit-authenticator>=0.4.1",
 ]
 
 
