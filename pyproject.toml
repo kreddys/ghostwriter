@@ -24,6 +24,8 @@ dependencies = [
     "google-search-results>=2.4.2",
     "langchain-pinecone>=0.0.3",
     "pinecone-client>=3.0.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
 ]
 
 

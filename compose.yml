@@ -38,5 +38,38 @@ services:
       - .env
     environment:
       REDIS_URI: redis://langgraph-redis:6379
-      LANGSMITH_API_KEY: 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
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
       POSTGRES_URI: postgres://postgres:postgres@langgraph-postgres:5432/postgres?sslmode=disable
+
+  fastapi-wrapper:
+    build:
+      context: .
+      dockerfile: Dockerfile.fastapi
+    ports:
+      - "8000:8000"
+    depends_on:
+      langgraph-api:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
+      LANGGRAPH_API_URL: http://langgraph-api:8000
+    volumes:
+      - ./src:/app/src
+
+  streamlit-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    ports:
+      - "8501:8501"
+    depends_on:
+      fastapi-wrapper:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      FASTAPI_URL: http://fastapi-wrapper:8000
+    volumes:
+      - ./src:/app/src
