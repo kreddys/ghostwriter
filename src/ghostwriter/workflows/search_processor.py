@@ -4,10 +4,10 @@ import json
 import re
 from typing import List
 from langchain_core.runnables import RunnableConfig
-from react_agent.state import State
-from react_agent.agents.query_generator_agent import generate_queries
-from react_agent.tools.combined_search import combined_search
-from react_agent.configuration import Configuration
+from ghostwriter.state import State
+from ghostwriter.agents.query_generator_agent import generate_queries
+from ghostwriter.tools.combined_search import combined_search
+from ghostwriter.configuration import Configuration
 from ..utils.firecrawl_client import scrape_url_content
 
 logger = logging.getLogger(__name__)

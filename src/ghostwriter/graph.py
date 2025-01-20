@@ -1,15 +1,15 @@
-"""Graph implementation for the React Agent."""
+"""Graph implementation for the GhostWriter system."""
 import logging
 from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableConfig
-from react_agent.state import State, InputState
-from react_agent.agents.article_writer import article_writer_agent
-from react_agent.tools.uniqueness_checker import uniqueness_checker
-from react_agent.tools.search_enricher import search_enricher
-from react_agent.workflows.search_processor import process_search
-from react_agent.workflows.ghost_publisher import publish_to_ghost
-from react_agent.workflows.url_storage import store_urls_in_supabase
-from react_agent.configuration import Configuration
+from ghostwriter.state import State, InputState
+from ghostwriter.agents.article_writer import article_writer_agent
+from ghostwriter.tools.uniqueness_checker import uniqueness_checker
+from ghostwriter.tools.search_enricher import search_enricher
+from ghostwriter.workflows.search_processor import process_search
+from ghostwriter.workflows.ghost_publisher import publish_to_ghost
+from ghostwriter.workflows.url_storage import store_urls_in_supabase
+from ghostwriter.configuration import Configuration
 from typing import Literal
 
 logger = logging.getLogger(__name__)

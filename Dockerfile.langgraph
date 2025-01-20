@@ -1,11 +1,9 @@
 FROM langchain/langgraph-api:3.11
 
-
-
-ADD . /deps/react-agent
+ADD . /deps/ghostwriter
 
 RUN PYTHONDONTWRITEBYTECODE=1 pip install --no-cache-dir -c /api/constraints.txt -e /deps/*
 
-ENV LANGSERVE_GRAPHS='{"agent": "/deps/react-agent/src/react_agent/graph.py:graph"}'
+ENV LANGSERVE_GRAPHS='{"agent": "/deps/ghostwriter/src/ghostwriter/graph.py:graph"}'
 
-WORKDIR /deps/react-agent
+WORKDIR /deps/ghostwriter

@@ -1,10 +1,8 @@
 [project]
-name = "react-agent"
+name = "ghostwriter"
 version = "0.0.1"
-description = "Starter template for making a custom Reasoning and Action agent (using tool calling) in LangGraph."
-authors = [
-    { name = "William Fu-Hinthorn", email = "13333726+hinthornw@users.noreply.github.com" },
-]
+description = "Ghost CMS content generation system using LangGraph for automated article creation, curation and publishing."
+authors = [{ name = "Kishore Reddy", email = "kvkishorereddy@yahoo.com" }]
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
@@ -37,10 +35,9 @@ requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["langgraph.templates.react_agent", "react_agent"]
+packages = ["ghostwriter"]
 [tool.setuptools.package-dir]
-"langgraph.templates.react_agent" = "src/react_agent"
-"react_agent" = "src/react_agent"
+"ghostwriter" = "src/ghostwriter"
 
 
 [tool.setuptools.package-data]

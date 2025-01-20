@@ -43,7 +43,7 @@ services:
       DATABASE_URI: postgres://postgres:postgres@langgraph-postgres:5432/postgres
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
       LANGGRAPH_CLOUD_LICENSE_KEY: ${LANGGRAPH_CLOUD_LICENSE_KEY}
-      LANGSERVE_GRAPHS: '{"agent": "/app/src/react_agent/graph.py:graph"}'
+      LANGSERVE_GRAPHS: '{"agent": "/app/src/ghostwriter/graph.py:graph"}'
       STORE_CONFIG: '{"index": {"embed": "openai:text-embedding-3-small", "dims": 1536}}'
     volumes:
       - ./src:/app/src

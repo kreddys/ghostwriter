@@ -1,8 +1,8 @@
 """Ghost publishing workflow."""
 import logging
 from langchain_core.runnables import RunnableConfig
-from react_agent.state import State
-from react_agent.tools.ghost_publisher import ghost_publisher
+from ghostwriter.state import State
+from ghostwriter.tools.ghost_publisher import ghost_publisher
 
 logger = logging.getLogger(__name__)
 

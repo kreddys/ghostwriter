@@ -1,8 +1,8 @@
 """URL storage workflow."""
 import logging
 from langchain_core.runnables import RunnableConfig
-from react_agent.state import State
-from react_agent.tools.supabase_url_store import supabase_url_store
+from ghostwriter.state import State
+from ghostwriter.tools.supabase_url_store import supabase_url_store
 
 logger = logging.getLogger(__name__)
 

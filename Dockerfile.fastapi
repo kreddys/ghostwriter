@@ -23,5 +23,6 @@ COPY --from=builder /root/.local /root/.local
 COPY --from=builder /app/src /app/src
 
 ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/app/src/ghostwriter
 
 CMD ["uvicorn", "src.fastapi_app:app", "--host", "0.0.0.0", "--port", "8000"]

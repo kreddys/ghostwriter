@@ -1,7 +1,7 @@
-"""React Agent.
+"""GhostWriter.
 
-This module defines a custom reasoning and action agent graph.
-It invokes tools in a simple loop.
+This module defines an AI-powered news article generation and publishing system.
+It manages workflows for content creation and CMS integration.
 """
 
 import logging
@@ -16,7 +16,7 @@ logging.basicConfig(
 )
 
 # Create logger for this package
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('ghostwriter')
 
 from .graph import create_graph
 
