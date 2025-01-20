@@ -62,7 +62,13 @@ async def stream_run(
     webhook: str | None = None
 ) -> AsyncGenerator[str, None]:
     """Stream run response"""
-    timeout = httpx.Timeout(60.0, connect=10.0)
+
+    timeout =     timeout = httpx.Timeout(
+        timeout=300.0,  # 5 minutes total timeout
+        connect=30.0,   # 30 seconds connect timeout
+        read=None      # No read timeout for streaming
+    )
+
     async with httpx.AsyncClient(timeout=timeout) as client:
         payload = {
             "thread_id": thread_id,
@@ -88,7 +94,8 @@ async def stream_run(
                 headers={
                     "Accept": "text/event-stream",
                     "Cache-Control": "no-cache",
-                    "Connection": "keep-alive"
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no"
                 }
             ) as response:
                 response.raise_for_status()
@@ -278,8 +285,8 @@ def main():
                     
                     # Initialize connection state
                     last_received = datetime.now()
-                    keepalive_interval = 5  # seconds
-                    max_idle_time = 30  # seconds
+                    keepalive_interval = 30  # seconds
+                    max_idle_time = 300  # seconds
                     
                     async for chunk in stream_run(
                         st.session_state.thread["thread_id"],
@@ -305,6 +312,9 @@ def main():
                                         # Update last received time but don't display
                                         last_received = datetime.now()
                                         continue
+                                    elif data.get("status") == "completed":
+                                        logger.info("Stream completed successfully")
+                                        break
                                         
                                 # Update last received time and display content
                                 last_received = datetime.now()
