@@ -11,7 +11,7 @@ RUN apt-get update && \
     curl \
     && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && . $HOME/.cargo/env \
-    && pip install --user --no-warn-script-location -e .[dev] \
+    && pip install --user --no-warn-script-location langgraph fastapi uvicorn httpx \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
