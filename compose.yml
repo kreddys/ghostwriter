@@ -40,6 +40,7 @@ services:
       REDIS_URI: redis://langgraph-redis:6379
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
       POSTGRES_URI: postgres://postgres:postgres@langgraph-postgres:5432/postgres?sslmode=disable
+      #LOG_LEVEL: debug
 
   fastapi-wrapper:
     build:
