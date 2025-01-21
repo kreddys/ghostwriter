@@ -8,7 +8,7 @@ from ghostwriter.state import State
 from ghostwriter.agents.query_generator_agent import generate_queries
 from ghostwriter.tools.combined_search import combined_search
 from ghostwriter.configuration import Configuration
-from ..utils.firecrawl_client import scrape_url_content
+from ..utils.crawler_utils import update_results_with_crawler_data
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +57,16 @@ async def process_search(state: State, config: RunnableConfig) -> State:
         state.is_direct_url = True
         state.direct_url = query
         
-        direct_result = await scrape_url_content(query)
-        if direct_result:
-            state.search_results[query.lower()] = [direct_result]
-            state.url_filtered_results[query.lower()] = [direct_result]
+        # Use crawler utilities to process the URL
+        configuration = Configuration.from_runnable_config(config)
+        crawled_results = await update_results_with_crawler_data(
+            [{"url": query}],
+            configuration
+        )
+        
+        if crawled_results and crawled_results[0].get("scrape_status") == "success":
+            state.search_results[query.lower()] = crawled_results
+            state.url_filtered_results[query.lower()] = crawled_results
             state.search_successful = True
             logger.info("Direct URL processing completed successfully")
         else:

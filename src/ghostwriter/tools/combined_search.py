@@ -7,7 +7,8 @@ from langchain_core.tools import InjectedToolArg
 from ..utils.google_search import google_search
 from ..utils.tavily_search import tavily_search
 from ..utils.serp_search import serp_search
-from ..utils.firecrawl_client import scrape_url_content
+from ..utils.youtube_search import youtube_search
+from ..utils.crawler_utils import update_results_with_crawler_data
 from ..configuration import Configuration
 from ..state import State
 
@@ -16,7 +17,8 @@ logger = logging.getLogger(__name__)
 SEARCH_ENGINE_MAPPING = {
     "google": google_search,
     "tavily": tavily_search,
-    "serp": serp_search
+    "serp": serp_search,
+    "youtube": youtube_search
 }
 
 def get_unique_results(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -32,44 +34,6 @@ def get_unique_results(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             
     return unique_results
 
-async def update_with_firecrawl(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Update search results with Firecrawl data."""
-    updated_results = []
-    
-    for result in results:
-        url = result.get('url')
-        if not url:
-            result['scrape_status'] = 'failure'
-            updated_results.append(result)
-            continue
-            
-        try:
-            firecrawl_data = await scrape_url_content(url)
-            if firecrawl_data:
-                # Merge the Firecrawl data with the original result
-                merged_result = {
-                    **result,
-                    'title': firecrawl_data.get('title', result.get('title')),
-                    'content': firecrawl_data.get('content', result.get('content')),
-                    'metadata': {
-                        **(result.get('metadata', {})),
-                        **(firecrawl_data.get('metadata', {}))
-                    },
-                    'scrape_status': 'success'
-                }
-                logger.info(f"Successfully updated result with Firecrawl data for URL: {url}")
-                updated_results.append(merged_result)
-            else:
-                result['scrape_status'] = 'failure'
-                logger.warning(f"Firecrawl failed for URL: {url}, keeping original data")
-                updated_results.append(result)
-        except Exception as e:
-            result['scrape_status'] = 'failure'
-            logger.error(f"Error updating result with Firecrawl for URL {url}: {str(e)}")
-            updated_results.append(result)
-            
-    return updated_results
-
 async def combined_search(
     queries: Union[str, List[str]],
     config: RunnableConfig,
@@ -79,7 +43,7 @@ async def combined_search(
     Combined search functionality that:
     1. Executes searches for all queries using configured search engines
     2. Removes duplicate URLs
-    3. Updates unique results with Firecrawl data
+    3. Updates unique results with crawler data
     """
     logger.info("Starting combined search")
     
@@ -112,7 +76,6 @@ async def combined_search(
                 results = await search_func(query, config=config, state=state)
                 if results:
                     logger.info(f"{engine_name} search returned {len(results)} results")
-                    logger.info(f"{engine_name} URLs: {[result.get('url') for result in results]}")
                     all_results.extend(results)
             except Exception as e:
                 logger.error(f"{engine_name} search failed for query '{query}': {str(e)}")
@@ -125,13 +88,16 @@ async def combined_search(
     unique_results = get_unique_results(all_results)
     logger.info(f"Found {len(unique_results)} unique results from {len(all_results)} total results")
     
-    # Step 3: Update unique results with Firecrawl
+    # Step 3: Update unique results with configured crawler
     try:
-        final_results = await update_with_firecrawl(unique_results)
-        logger.info(f"Successfully updated {len(final_results)} results with Firecrawl")
+        final_results = await update_results_with_crawler_data(
+            unique_results,
+            configuration
+        )
+        logger.info(f"Successfully updated {len(final_results)} results with crawler")
         return final_results
     except Exception as e:
         for result in unique_results:
             result['scrape_status'] = 'failure'
-        logger.error(f"Error during Firecrawl update: {str(e)}")
-        return unique_results  # Return unique results without Firecrawl updates if it fails
+        logger.error(f"Error during crawler update: {str(e)}")
+        return unique_results  # Return unique results without crawler updates if it fails

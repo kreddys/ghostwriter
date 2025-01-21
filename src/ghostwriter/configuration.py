@@ -31,9 +31,9 @@ class Configuration:
     )
 
     search_engines: list[str] = field(
-        default_factory=lambda: ["tavily"], #["google", "tavily", "serp"]
+        default_factory=lambda: ["youtube"], #["google", "tavily", "serp", "youtube"]
         metadata={
-            "description": "List of search engines to use. Options: 'google', 'tavily', 'serp'. "
+            "description": "List of search engines to use. Options: 'google', 'tavily', 'serp', 'youtube'. "
             "Empty list will use all available engines."
         },
     )
@@ -106,6 +106,14 @@ class Configuration:
         metadata={
             "description": "Threshold for determining content relevance using cosine similarity. "
             "Higher values are more strict (require more similarity)."
+        },
+    )
+
+    crawling_engines: list[str] = field(
+        default_factory=lambda: ["firecrawl","youtube"],
+        metadata={
+            "description": "List of crawling engines to use. Options: 'firecrawl'. "
+            "Empty list will use all available engines."
         },
     )
 

@@ -25,6 +25,7 @@ dependencies = [
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
     "streamlit-authenticator>=0.4.1",
+    "youtube-transcript-api>=0.6.1",
 ]
 
 

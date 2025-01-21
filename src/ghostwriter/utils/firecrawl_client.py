@@ -39,7 +39,7 @@ def clean_content(content: str) -> str:
     
     return cleaned_content
 
-async def scrape_url_content(url: str) -> Optional[Dict]:
+async def firecrawl_scrape_url(url: str) -> Optional[Dict]:
     """
     Scrape content from a URL using Firecrawl API.
     
@@ -47,14 +47,18 @@ async def scrape_url_content(url: str) -> Optional[Dict]:
         url (str): The URL to scrape
         
     Returns:
-        Optional[Dict]: Dictionary containing scraped content or None if failed
+        Optional[Dict]: Dictionary containing Firecrawl-specific scraped content or None if failed
+        
+    Raises:
+        ValueError: If required Firecrawl configuration is missing
     """
     api_key = os.getenv("FIRECRAWL_API_KEY")
     if not api_key:
         logger.error("FIRECRAWL_API_KEY environment variable not set")
-        return None
+        raise ValueError("Firecrawl API key is required")
 
-    api_url = "https://api.firecrawl.dev/v1/scrape"
+    # Allow custom Firecrawl endpoint configuration
+    api_url = os.getenv("FIRECRAWL_API_URL", "https://api.firecrawl.dev/v1/scrape")
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"

@@ -75,21 +75,22 @@ ALLOWED_USERS=your_email@example.com
 
 ### Runtime Parameters (configuration.py)
 
-| Parameter                        | Type      | Default                | Description                                     |
-| -------------------------------- | --------- | ---------------------- | ----------------------------------------------- |
-| `system_prompt`                  | str       | System prompt          | Sets agent's behavior and context               |
-| `model`                          | str       | "deepseek/deepseek-v3" | Language model for content generation           |
-| `search_engines`                 | list[str] | ["tavily"]             | Search engines: "google", "tavily", "serp"      |
-| `max_search_results`             | int       | 2                      | Max results per search query                    |
-| `sites_list`                     | list[str] | None                   | Specific websites to search                     |
-| `search_days`                    | int       | 7                      | Days to look back for search results            |
-| `slack_enabled`                  | bool      | True                   | Enable Slack notifications                      |
-| `slack_format_code_blocks`       | bool      | True                   | Format Slack messages as code blocks            |
-| `use_query_generator`            | bool      | False                  | Generate search queries from user input         |
-| `use_url_filtering`              | bool      | False                  | Filter URLs already in Supabase                 |
-| `use_search_enricher`            | bool      | False                  | Find additional relevant content                |
-| `similarity_threshold`           | float     | 0.80                   | Content uniqueness threshold (lower = stricter) |
-| `relevance_similarity_threshold` | float     | 0.90                   | Content relevance threshold (higher = stricter) |
+| Parameter                        | Type      | Default                | Description                                                   |
+| -------------------------------- | --------- | ---------------------- | ------------------------------------------------------------- |
+| `system_prompt`                  | str       | System prompt          | Sets agent's behavior and context                             |
+| `model`                          | str       | "deepseek/deepseek-v3" | Language model for content generation                         |
+| `search_engines`                 | list[str] | ["tavily"]             | Search engines: "google", "tavily", "serp"                    |
+| `max_search_results`             | int       | 2                      | Max results per search query                                  |
+| `sites_list`                     | list[str] | None                   | Specific websites to search                                   |
+| `search_days`                    | int       | 7                      | Days to look back for search results                          |
+| `slack_enabled`                  | bool      | True                   | Enable Slack notifications                                    |
+| `slack_format_code_blocks`       | bool      | True                   | Format Slack messages as code blocks                          |
+| `use_query_generator`            | bool      | False                  | Generate search queries from user input                       |
+| `use_url_filtering`              | bool      | False                  | Filter URLs already in Supabase                               |
+| `use_search_enricher`            | bool      | False                  | Find additional relevant content                              |
+| `similarity_threshold`           | float     | 0.80                   | Content uniqueness threshold (lower = stricter)               |
+| `relevance_similarity_threshold` | float     | 0.90                   | Content relevance threshold (higher = stricter)               |
+| `crawling_engines`               | list[str] | ["firecrawl"]          | Crawling engines to use. Currently only 'firecrawl' supported |
 
 ### Setup Steps
 
