@@ -168,3 +168,4 @@ logs/
 
 ssh.key
 ssh.key.pub
+client_secret.json

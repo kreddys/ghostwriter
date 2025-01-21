@@ -9,7 +9,7 @@ RUN apt-get update && \
     gcc \
     build-essential \
     curl \
-    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && curl --retry 5 --retry-delay 2 --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && . $HOME/.cargo/env \
     && pip install --user --no-warn-script-location -e .[dev] streamlit \
     && apt-get clean \
@@ -19,9 +19,20 @@ RUN apt-get update && \
 FROM python:3.11-slim
 
 WORKDIR /app
-COPY --from=builder /root/.local /root/.local
-COPY --from=builder /app/src /app/src
 
-ENV PATH=/root/.local/bin:$PATH
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install Python requirements
+COPY requirements-streamlit.txt .
+RUN pip install --no-cache-dir -r requirements-streamlit.txt
+
+# Copy application files
+COPY . .
+
+# Ensure proper permissions for client_secret.json
+RUN chmod 600 client_secret.json
 
 CMD ["streamlit", "run", "src/streamlit_app.py"]

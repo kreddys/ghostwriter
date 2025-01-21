@@ -1,39 +1,22 @@
+import os
 import streamlit as st
-import yaml
-from yaml.loader import SafeLoader
-import streamlit_authenticator as stauth
-
-# Load authentication config
-with open('streamlit_auth_config.yaml') as file:
-    config = yaml.load(file, Loader=SafeLoader)
-
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
-)
-
-# Login widget
-name, authentication_status, username = authenticator.login('Login', 'main')
-
-if authentication_status:
-    authenticator.logout('Logout', 'main')
-    st.write(f'Welcome *{name}*')
-elif authentication_status is False:
-    st.error('Username/password is incorrect')
-elif authentication_status is None:
-    st.warning('Please enter your username and password')
-
-# Only show app content if authenticated
-if not authentication_status:
-    st.stop()
-
 import httpx
 import json
 import asyncio
-import logging
-from datetime import datetime
+from dotenv import load_dotenv
+from auth.authenticate import Authenticator
+
+# Load environment variables
+load_dotenv()
+
+# Initialize authentication
+allowed_users = os.getenv("ALLOWED_USERS").split(",")
+authenticator = Authenticator(
+    allowed_users=allowed_users,
+    token_key=os.getenv("TOKEN_KEY"),
+    secret_path="client_secret.json",
+    redirect_uri="http://localhost:8501",
+)
 
 # Default configuration values matching configuration.py
 DEFAULT_CONFIG = {
@@ -52,13 +35,6 @@ DEFAULT_CONFIG = {
     "relevance_similarity_threshold": 0.90
 }
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(name)s %(message)s'
-)
-logger = logging.getLogger(__name__)
-
 # Configuration
 FASTAPI_URL = "http://fastapi-wrapper:8000"
 
@@ -66,26 +42,19 @@ async def call_fastapi(content: str, config: dict):
     """Call FastAPI endpoint with content and configuration"""
     timeout = httpx.Timeout(30.0)  # 30 seconds timeout
     
-    # Log the complete configuration being sent
-    logger.debug(f"Sending configuration: {json.dumps(config, indent=2)}")
-    
     async with httpx.AsyncClient(timeout=timeout) as client:
         payload = {
             "input": {"messages": [{"role": "human", "content": content}]},
             "config": config
         }
         
-        logger.debug(f"Complete payload: {json.dumps(payload, indent=2)}")
-        
         try:
-            logger.debug(f"Sending request to FastAPI at {FASTAPI_URL}/runs")
             async with client.stream(
                 "POST",
                 f"{FASTAPI_URL}/runs",
                 json=payload,
                 headers={"Content-Type": "application/json"}
             ) as response:
-                logger.debug(f"Received response: {response.status_code}")
                 response.raise_for_status()
                 
                 # Create a container to display the streaming response
@@ -94,21 +63,14 @@ async def call_fastapi(content: str, config: dict):
                 
                 async for chunk in response.aiter_text():
                     if chunk:
-                        try:
-                            # Append each chunk to the full response
-                            full_response += chunk
-                            # Display the current response
-                            response_container.text(full_response)
-                        except Exception as e:
-                            logger.error(f"Error processing chunk: {str(e)}")
-                            return {"error": f"Error processing chunk: {str(e)}"}
+                        full_response += chunk
+                        response_container.text(full_response)
                 
                 return {"response": full_response}
         except Exception as e:
-            logger.error(f"Error calling FastAPI: {str(e)}")
             return {"error": str(e)}
 
-def main():
+def show_app_content():
     st.title("FastAPI Client with Configuration")
     
     # Content input
@@ -200,5 +162,20 @@ def main():
             except Exception as e:
                 st.error(f"Error: {str(e)}")
 
+# Check authentication
+authenticator.check_auth()
+authenticator.login()
+
+# Show app content only if authenticated
+if st.session_state.get("connected"):
+    st.write(f"Welcome! {st.session_state['user_info'].get('email')}")
+    if st.button("Log out"):
+        authenticator.logout()
+        st.rerun()
+    
+    show_app_content()
+else:
+    st.write("Please log in to access the application")
+
 if __name__ == "__main__":
-    main()
+    pass
