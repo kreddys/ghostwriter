@@ -2,11 +2,11 @@
 import logging
 from langchain_core.runnables import RunnableConfig
 from ghostwriter.state import State
-from ghostwriter.tools.supabase_url_store import supabase_url_store
+from ghostwriter.utils.unique.url_store_supabase import supabase_url_store
 
 logger = logging.getLogger(__name__)
 
-async def store_urls_in_supabase(state: State, config: RunnableConfig) -> State:
+async def store_urls(state: State, config: RunnableConfig) -> State:
     """Store article URLs in Supabase."""
     logger.info("Starting Supabase URL storage process")
     

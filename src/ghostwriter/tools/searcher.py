@@ -5,10 +5,10 @@ import re
 from typing import List
 from langchain_core.runnables import RunnableConfig
 from ghostwriter.state import State
-from ghostwriter.agents.query_generator_agent import generate_queries
-from ghostwriter.tools.combined_search import combined_search
+from ghostwriter.agents.query_generator import generate_queries
+from ghostwriter.utils.search.search import combined_search
 from ghostwriter.configuration import Configuration
-from ..utils.crawler_utils import update_results_with_crawler_data
+from .scraper import update_results_with_crawler_data
 
 logger = logging.getLogger(__name__)
 

@@ -3,8 +3,8 @@
 import logging
 from typing import Dict, List, Optional
 from ..configuration import Configuration
-from ..utils.firecrawl_client import firecrawl_scrape_url
-from ..utils.youtube_crawler import crawl_youtube_video
+from ..utils.scrape.firecrawl import firecrawl_scrape_url
+from ..utils.scrape.youtube import crawl_youtube_video
 
 logger = logging.getLogger(__name__)
 

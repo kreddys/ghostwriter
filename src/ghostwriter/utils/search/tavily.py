@@ -5,8 +5,8 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
 from tavily import TavilyClient, InvalidAPIKeyError, MissingAPIKeyError, UsageLimitExceededError
 
-from ..configuration import Configuration
-from ..state import State
+from ...configuration import Configuration
+from ...state import State
 
 logger = logging.getLogger(__name__)
 

@@ -8,11 +8,11 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
 from pinecone import Pinecone
 
-from ..state import State
-from ..configuration import Configuration
-from ..tools.combined_search import combined_search
-from ..prompts import SEARCH_TERM_PROMPT
-from ..llm import get_llm
+from ...state import State
+from ...configuration import Configuration
+from .search import combined_search
+from ...prompts import SEARCH_TERM_PROMPT
+from ...llm import get_llm
 
 logger = logging.getLogger(__name__)
 

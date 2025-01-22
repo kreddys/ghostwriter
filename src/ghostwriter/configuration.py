@@ -31,7 +31,7 @@ class Configuration:
     )
 
     search_engines: list[str] = field(
-        default_factory=lambda: ["youtube"], #["google", "tavily", "serp", "youtube"]
+        default_factory=lambda: ["youtube", "google"], #["google", "tavily", "serp", "youtube"]
         metadata={
             "description": "List of search engines to use. Options: 'google', 'tavily', 'serp', 'youtube'. "
             "Empty list will use all available engines."

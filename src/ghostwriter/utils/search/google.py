@@ -7,8 +7,8 @@ from langchain_core.tools import InjectedToolArg
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from ..configuration import Configuration
-from ..state import State
+from ...configuration import Configuration
+from ...state import State
 
 logger = logging.getLogger(__name__)
 

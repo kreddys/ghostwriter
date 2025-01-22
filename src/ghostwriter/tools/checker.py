@@ -10,11 +10,11 @@ from langchain.text_splitter import TokenTextSplitter
 from pinecone import Pinecone
 from supabase import create_client, Client
 from ..state import State
-from ..utils.ghost_api import fetch_ghost_articles
+from ..utils.ghost.api import fetch_ghost_articles
 from ..configuration import Configuration
 from ..prompts import RELEVANCY_CHECK_PROMPT 
 from ..llm import get_llm
-from ..utils.url_filter import filter_existing_urls
+from ..utils.unique.url_filter_supabase import filter_existing_urls
 
 logger = logging.getLogger(__name__)
 

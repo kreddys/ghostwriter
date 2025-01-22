@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage
 from supabase import create_client, Client
 import os
 
-from ..state import State
+from ...state import State
 
 logger = logging.getLogger(__name__)
 

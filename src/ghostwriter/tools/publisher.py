@@ -2,7 +2,7 @@
 import logging
 from langchain_core.runnables import RunnableConfig
 from ghostwriter.state import State
-from ghostwriter.tools.ghost_publisher import ghost_publisher
+from ghostwriter.utils.ghost.publish import ghost_publisher
 
 logger = logging.getLogger(__name__)
 

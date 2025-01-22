@@ -4,11 +4,11 @@ from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableConfig
 from ghostwriter.state import State, InputState
 from ghostwriter.agents.article_writer import article_writer_agent
-from ghostwriter.tools.uniqueness_checker import uniqueness_checker
-from ghostwriter.tools.search_enricher import search_enricher
-from ghostwriter.workflows.search_processor import process_search
-from ghostwriter.workflows.ghost_publisher import publish_to_ghost
-from ghostwriter.workflows.url_storage import store_urls_in_supabase
+from ghostwriter.tools.checker import uniqueness_checker
+from ghostwriter.utils.search.enrich import search_enricher
+from ghostwriter.tools.searcher import process_search
+from ghostwriter.tools.publisher import publish_to_ghost
+from ghostwriter.utils.unique.url_store import store_urls
 from ghostwriter.configuration import Configuration
 from typing import Literal
 
@@ -57,7 +57,7 @@ def create_graph() -> StateGraph:
     workflow.add_node("enrich_search", search_enricher)
     workflow.add_node("generate", article_writer_agent)
     workflow.add_node("publish", publish_to_ghost)
-    workflow.add_node("store_urls", store_urls_in_supabase)
+    workflow.add_node("store_urls", store_urls)
     
     # Add conditional routing after search to check search_successful
     workflow.add_conditional_edges(

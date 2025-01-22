@@ -4,8 +4,8 @@ import logging
 from typing import Dict, List, Optional
 from googleapiclient.discovery import build
 from langchain_core.runnables import RunnableConfig
-from ..configuration import Configuration
-from ..state import State
+from ...configuration import Configuration
+from ...state import State
 
 logger = logging.getLogger(__name__)
 

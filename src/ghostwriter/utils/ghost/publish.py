@@ -8,9 +8,9 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
 from langchain_core.messages import AIMessage
 
-from ..state import State
-from .slack_notifier import send_slack_notification
-from ..utils.ghost_token import generate_ghost_token
+from ...state import State
+from ..notify.slack import send_slack_notification
+from .token import generate_ghost_token
 
 logger = logging.getLogger(__name__)
 
