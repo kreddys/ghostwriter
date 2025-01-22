@@ -1,6 +1,6 @@
 """Ghost Publisher functionality."""
 import logging
-from typing import Annotated, Dict, List
+from typing import Annotated, Dict, List, Union
 import json
 import os
 import aiohttp
@@ -9,16 +9,15 @@ from langchain_core.tools import InjectedToolArg
 from langchain_core.messages import AIMessage
 
 from ...state import State
-from ..notify.slack import send_slack_notification
 from .token import generate_ghost_token
-
 logger = logging.getLogger(__name__)
 
 async def ghost_publisher(
-    articles: Dict[str, List[AIMessage]], 
+    articles: Union[Dict[str, List[AIMessage]], List[AIMessage]], 
     *, 
     config: Annotated[RunnableConfig, InjectedToolArg],
-    state: State
+    state: State,
+    publish_status: str = "draft"
 ) -> bool:
     """Send articles to Ghost CMS as drafts."""
     logger.info("Starting Ghost Publisher")
@@ -32,13 +31,20 @@ async def ghost_publisher(
             logger.error("Missing Ghost credentials")
             return False
         
-        messages = articles.get("messages", [])
+        # Handle both dict and list input formats
+        messages = articles if isinstance(articles, list) else articles.get("messages", [])
+        published_urls = []
         
         async with aiohttp.ClientSession() as session:
             for message in messages:
                 try:
+                    # Handle both AIMessage and dict formats
+                    if hasattr(message, 'content'):
+                        content = message.content.strip()
+                    else:
+                        content = message.get('content', '').strip()
+                    
                     # Clean up the content by removing markdown code block markers
-                    content = message.content.strip()
                     if content.startswith("```json"):
                         content = content[7:]  # Remove ```json
                     if content.endswith("```"):
@@ -60,7 +66,7 @@ async def ghost_publisher(
                                 "title": post["title"],
                                 "lexical": post["lexical"],  # Use the lexical format directly
                                 "tags": [{"name": tag} for tag in post.get("tags", [])],
-                                "status": "draft"
+                                "status": publish_status
                             }]
                         }
                         
@@ -76,13 +82,11 @@ async def ghost_publisher(
                             if response.status == 201:  # Successfully created
                                 response_data = await response.json()
                                 post_url = response_data["posts"][0]["url"]
-                                
-                                # Send Slack notification
-                                await send_slack_notification(
-                                    title=post['title'],
-                                    tags=post.get('tags', []),
-                                    post_url=post_url
-                                )
+                                published_urls.append({
+                                    "url": post_url,
+                                    "title": post["title"],
+                                    "tags": post.get("tags", [])
+                                })
                                 logger.info(f"Successfully created Ghost post: {post['title']}")
                             else:
                                 error_data = await response.text()
@@ -96,7 +100,7 @@ async def ghost_publisher(
                     logger.error(f"Error processing article: {str(e)}")
                     continue
         
-        return True
+        return published_urls if published_urls else None
         
     except Exception as e:
         logger.error(f"Unexpected error in Ghost publisher: {str(e)}", exc_info=True)

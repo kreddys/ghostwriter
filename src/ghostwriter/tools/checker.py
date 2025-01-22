@@ -60,7 +60,6 @@ async def uniqueness_checker(
 ) -> State:
     """Filter and return unique search results using Pinecone and check topic relevancy."""
     logger.info("=== Starting Uniqueness Checker ===")
-    logger.info("Initializing checker state...")
     
     # Initialize checker state
     if 'checker' not in state.tool_states:
@@ -73,6 +72,36 @@ async def uniqueness_checker(
     checker_state = state.tool_states['checker']
     
     try:
+        # Check if we have direct_url results from searcher
+        searcher_state = state.tool_states.get('searcher', {})
+        search_results = searcher_state.get('search_results', {})
+        
+        # Check for direct_url results
+        direct_results = {}
+        for query, results in search_results.items():
+            if results and isinstance(results, list) and len(results) > 0:
+                if results[0].get('search_source') == 'direct_url':
+                    direct_results[query] = results
+                    logger.info(f"Found direct URL results for query: {query}")
+        
+        if direct_results:
+            # Skip verification for direct URLs but ensure content is passed through
+            logger.info("Processing direct URLs - skipping verification")
+            for query, results in direct_results.items():
+                # Get the corresponding scraped content
+                scraper_state = state.tool_states.get('scraper', {})
+                scraped_results = scraper_state.get('scraped_results', {})
+                if query in scraped_results:
+                    # Update results with scraped content
+                    scraped_content = scraped_results[query][0].get('content', '')
+                    results[0]['content'] = scraped_content
+                    logger.info(f"Added scraped content to direct URL result: {query}")
+            
+            checker_state['unique_results'] = direct_results
+            checker_state['check_successful'] = True
+            return state
+            
+        # Proceed with normal verification for non-direct URLs
         logger.info("Fetching scraper results...")
         scraper_state = state.tool_states.get('scraper', {})
         scraped_results = scraper_state.get('scraped_results', {})
