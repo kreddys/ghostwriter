@@ -7,6 +7,7 @@ from ghostwriter.agents.article_writer import article_writer_agent
 from ghostwriter.tools.checker import uniqueness_checker
 from ghostwriter.utils.search.enrich import search_enricher
 from ghostwriter.tools.searcher import process_search
+from ghostwriter.tools.scraper import process_scrape
 from ghostwriter.tools.publisher import publish_to_ghost
 from ghostwriter.utils.unique.url_store import store_urls
 from ghostwriter.configuration import Configuration
@@ -16,11 +17,60 @@ logger = logging.getLogger(__name__)
 
 def check_search_status(state: State) -> str:
     """Check if search was successful and determine next step."""
-    if not state.search_successful:
+    # Get searcher state or initialize if not present
+    searcher_state = state.tool_states.get('searcher', {})
+    search_successful = searcher_state.get('search_successful', False)
+    
+    if not search_successful:
         logger.info("Search was unsuccessful, ending workflow")
         return "end"
-    logger.info("Search was successful, continuing to check uniqueness")
-    return "check_uniqueness"
+    logger.info("Search was successful, routing to scrape")
+    return "scrape"
+
+def should_generate_articles(state: State) -> Literal["next_step", "end"]:
+    """Determine if we should proceed with article generation based on checker state."""
+    checker_state = state.tool_states.get('checker', {})
+    unique_results = checker_state.get('unique_results', {})
+    
+    if not unique_results:
+        logger.info("No unique results found - stopping the process")
+        return "end"
+    
+    total_results = sum(len(results) for results in unique_results.values() if isinstance(results, list))
+    if total_results == 0:
+        logger.info("No unique results to process - stopping the process")
+        return "end"
+        
+    logger.info(f"Found {total_results} unique results - proceeding to next step")
+    return "next_step"
+"""Graph implementation for the GhostWriter system."""
+import logging
+from langgraph.graph import StateGraph, END
+from langchain_core.runnables import RunnableConfig
+from ghostwriter.state import State, InputState
+from ghostwriter.agents.article_writer import article_writer_agent
+from ghostwriter.tools.checker import uniqueness_checker
+from ghostwriter.utils.search.enrich import search_enricher
+from ghostwriter.tools.searcher import process_search
+from ghostwriter.tools.scraper import process_scrape
+from ghostwriter.tools.publisher import publish_to_ghost
+from ghostwriter.utils.unique.url_store import store_urls
+from ghostwriter.configuration import Configuration
+from typing import Literal
+
+logger = logging.getLogger(__name__)
+
+def check_search_status(state: State) -> str:
+    """Check if search was successful and determine next step."""
+    # Get searcher state or initialize if not present
+    searcher_state = state.tool_states.get('searcher', {})
+    search_successful = searcher_state.get('search_successful', False)
+    
+    if not search_successful:
+        logger.info("Search was unsuccessful, ending workflow")
+        return "end"
+    logger.info("Search was successful, routing to scrape")
+    return "scrape"
 
 def should_generate_articles(state: State) -> Literal["next_step", "end"]:
     """Determine if we should proceed with article generation."""
@@ -52,6 +102,7 @@ def create_graph() -> StateGraph:
     
     # Add the nodes
     workflow.add_node("search", process_search)
+    workflow.add_node("scrape", process_scrape)
     workflow.add_node("check_uniqueness", uniqueness_checker)
     workflow.add_node("next_step", determine_next_step)
     workflow.add_node("enrich_search", search_enricher)
@@ -64,10 +115,13 @@ def create_graph() -> StateGraph:
         "search",
         check_search_status,
         {
-            "check_uniqueness": "check_uniqueness",
+            "scrape": "scrape",
             "end": END
         }
     )
+    
+    # Add edge from scrape to check_uniqueness
+    workflow.add_edge("scrape", "check_uniqueness")
     
     # Add conditional routing after uniqueness check
     workflow.add_conditional_edges(

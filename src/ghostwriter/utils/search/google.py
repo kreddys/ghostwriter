@@ -66,8 +66,6 @@ async def google_search(
         else:
             logger.warning("No items found in Google search response")
         
-        state.search_results[query] = processed_results
-        
         logger.info(f"Successfully processed {len(processed_results)} Google search results")
         return processed_results
         

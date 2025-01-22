@@ -23,7 +23,6 @@ async def serp_search(
         configuration = Configuration.from_runnable_config(config)
         
         serp_api_key = os.getenv("SERPAPI_API_KEY")
-        
         if not serp_api_key:
             logger.error("Missing SerpAPI API key")
             raise ValueError("SerpAPI API key not found in environment variables")
@@ -42,7 +41,7 @@ async def serp_search(
             "tbs": f"qdr:d{configuration.search_days}"  # Time restriction
         }
         
-        logger.info(f"Executing SerpAPI search with params: {search_params}")
+        logger.info(f"Executing SerpAPI search with max results: {configuration.max_search_results}")
         
         search = GoogleSearch(search_params)
         results = search.get_dict()
@@ -63,11 +62,9 @@ async def serp_search(
         else:
             logger.warning("No organic results found in SerpAPI response")
         
-        state.search_results[query] = processed_results
-        
         logger.info(f"Successfully processed {len(processed_results)} SerpAPI search results")
         return processed_results
         
     except Exception as e:
-        logger.error(f"Error in SerpAPI search: {str(e)}", exc_info=True)
+        logger.error(f"Error performing SerpAPI search: {str(e)}", exc_info=True)
         raise ValueError(f"Error performing SerpAPI search: {str(e)}")

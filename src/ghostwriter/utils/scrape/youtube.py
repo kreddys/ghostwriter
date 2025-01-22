@@ -20,7 +20,7 @@ def get_video_id(url: str) -> Optional[str]:
         return query.get('v', [None])[0]
     return None
 
-async def crawl_youtube_video(url: str) -> Optional[Dict[str, str]]:
+async def scrape_youtube_video(url: str) -> Optional[Dict[str, str]]:
     """Crawl a YouTube video and return its transcript in Firecrawl format."""
     if not is_youtube_url(url):
         return None

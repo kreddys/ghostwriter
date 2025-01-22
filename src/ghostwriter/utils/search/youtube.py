@@ -1,90 +1,70 @@
-"""YouTube search functionality for Ghostwriter."""
-
+"""YouTube Search functionality."""
 import logging
-from typing import Dict, List, Optional
-from googleapiclient.discovery import build
+import os
+from typing import Annotated, Any, Optional, Dict, List
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import InjectedToolArg
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
 from ...configuration import Configuration
 from ...state import State
 
 logger = logging.getLogger(__name__)
 
-class YouTubeSearch:
-    def __init__(self, api_key: str):
-        self.youtube = build('youtube', 'v3', developerKey=api_key)
-
-    async def search(self, query: str, max_results: int = 5) -> List[Dict[str, str]]:
-        """Search YouTube for videos matching the query."""
-        try:
-            request = self.youtube.search().list(
-                q=query,
-                part='snippet',
-                maxResults=max_results,
-                type='video',
-                order='relevance'
-            )
-            response = request.execute()
-            
-            results = []
-            for item in response.get('items', []):
-                video_id = item['id']['videoId']
-                video_details = await self.get_video_details(video_id)
-                if video_details:
-                    results.append(video_details)
-            
-            return results
-        except Exception as e:
-            logger.error(f"YouTube search failed for query '{query}': {str(e)}")
-            return []
-
-    async def get_video_details(self, video_id: str) -> Optional[Dict[str, str]]:
-        """Get detailed information about a YouTube video."""
-        try:
-            request = self.youtube.videos().list(
-                part='snippet,contentDetails,statistics',
-                id=video_id
-            )
-            response = request.execute()
-            
-            if not response.get('items'):
-                return None
-                
-            item = response['items'][0]
-            snippet = item['snippet']
-            stats = item['statistics']
-            
-            return {
-                'title': snippet['title'],
-                'description': snippet['description'],
-                'url': f"https://www.youtube.com/watch?v={video_id}",
-                'channel': snippet['channelTitle'],
-                'published_at': snippet['publishedAt'],
-                'duration': item['contentDetails']['duration'],
-                'views': stats.get('viewCount', '0'),
-                'likes': stats.get('likeCount', '0'),
-                'comments': stats.get('commentCount', '0'),
-                'thumbnail': snippet['thumbnails']['high']['url']
-            }
-        except Exception as e:
-            logger.error(f"Failed to get details for video {video_id}: {str(e)}")
-            return None
-
 async def youtube_search(
-    query: str, 
-    config: RunnableConfig, 
+    query: str, *, config: Annotated[RunnableConfig, InjectedToolArg],
     state: State
-) -> List[Dict[str, str]]:
-    """Search YouTube for videos matching the query."""
-    import os
-    from dotenv import load_dotenv
-    load_dotenv()
+) -> Optional[List[Dict[str, Any]]]:
+    """Search YouTube using the YouTube Data API."""
+    logger.info(f"Starting YouTube search for query: {query}")
     
-    api_key = os.getenv("GOOGLE_API_KEY")
-    
-    if not api_key:
-        logger.error("YouTube API key not found in environment variables")
-        return []
+    try:
+        configuration = Configuration.from_runnable_config(config)
         
-    searcher = YouTubeSearch(api_key)
-    configuration = Configuration.from_runnable_config(config)
-    return await searcher.search(query, max_results=configuration.max_search_results)
+        youtube_api_key = os.getenv("GOOGLE_API_KEY")
+        if not youtube_api_key:
+            logger.error("Missing YouTube API credentials - API key not found")
+            raise ValueError("YouTube API key not found in environment variables")
+        
+        logger.debug("Building YouTube Data API service")
+        youtube = build('youtube', 'v3', developerKey=youtube_api_key)
+
+        search_params = {
+            "q": query,
+            "part": "snippet",
+            "maxResults": configuration.max_search_results,
+            "type": "video",
+            "order": "relevance"
+        }
+        
+        logger.info(f"Executing YouTube search with max results: {configuration.max_search_results}")
+        
+        response = youtube.search().list(**search_params).execute()
+        logger.debug(f"Raw YouTube API response: {response}")
+        
+        processed_results = []
+        if 'items' in response:
+            logger.info(f"Found {len(response['items'])} results from YouTube search")
+            for item in response['items']:
+                video_id = item['id']['videoId']
+                processed_results.append({
+                    "type": "video",
+                    "title": item['snippet'].get('title', 'N/A'),
+                    "url": f"https://www.youtube.com/watch?v={video_id}",
+                    "content": item['snippet'].get('description', 'N/A'),
+                    "source": "youtube",
+                    "thumbnail": item['snippet']['thumbnails']['high']['url']
+                })
+        else:
+            logger.warning("No items found in YouTube search response")
+        
+        logger.info(f"Successfully processed {len(processed_results)} YouTube search results")
+        return processed_results
+        
+    except HttpError as e:
+        logger.error(f"YouTube Search API error: {str(e)}", exc_info=True)
+        raise ValueError(f"YouTube Search API error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Unexpected error in YouTube search: {str(e)}", exc_info=True)
+        raise ValueError(f"Error performing YouTube search: {str(e)}")

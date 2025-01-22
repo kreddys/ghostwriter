@@ -14,14 +14,6 @@ from ghostwriter import prompts
 class Configuration:
     """The configuration for the agent."""
 
-    system_prompt: str = field(
-        default=prompts.SYSTEM_PROMPT,
-        metadata={
-            "description": "The system prompt to use for the agent's interactions. "
-            "This prompt sets the context and behavior for the agent."
-        },
-    )
-
     model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
         default="deepseek/deepseek-v3",
         metadata={
@@ -31,7 +23,7 @@ class Configuration:
     )
 
     search_engines: list[str] = field(
-        default_factory=lambda: ["youtube", "google"], #["google", "tavily", "serp", "youtube"]
+        default_factory=lambda: ["google", "youtube"], #["google", "tavily", "serp", "youtube"]
         metadata={
             "description": "List of search engines to use. Options: 'google', 'tavily', 'serp', 'youtube'. "
             "Empty list will use all available engines."
@@ -109,12 +101,19 @@ class Configuration:
         },
     )
 
-    crawling_engines: list[str] = field(
+    scraping_engines: list[str] = field(
         default_factory=lambda: ["firecrawl","youtube"],
         metadata={
-            "description": "List of crawling engines to use. Options: 'firecrawl'. "
+            "description": "List of scraping engines to use. Options: 'firecrawl', 'youtube'. "
             "Empty list will use all available engines."
         },
+    )
+
+    topic: str = field(
+        default="Amaravati Capital City, Andhra Pradesh",
+        metadata={
+            "description": "The topic to focus on for content generation and filtering"
+        }
     )
 
     @classmethod

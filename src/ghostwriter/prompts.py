@@ -1,13 +1,5 @@
 """Default prompts used by the agent."""
 
-SYSTEM_PROMPT = """You are a helpful assistant. Current time: {system_time}
-
-When searching for recent information:
-- Use a single, comprehensive search query
-- Avoid making multiple similar searches with different time frames
-- Consolidate time-based queries into one search using "recent" or "latest"
-"""
-
 ARTICLE_WRITER_PROMPT = """You are an expert content writer. Your task is to create timely and detailed news article formatted specifically for Ghost CMS.
 
 Generate the news article in the following JSON structure:
@@ -42,7 +34,9 @@ When writing the article:
 - Include relevant statistics, numbers, and quantitative data from sources
 - Add context about how this news impacts the industry/sector
 
-Here are the web search results on latest topics, generate one news article using this content: {web_search_results}
+Here is the title: {title} , Update the ticket according to the content and the writing instructions.
+Here is the content to be used to generate article, generate one news article using this content: {content}
+
 
 Available tags for categorization: {tag_names}
 

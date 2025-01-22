@@ -8,7 +8,6 @@ from .google import google_search
 from .tavily import tavily_search
 from .serp import serp_search
 from .youtube import youtube_search
-from ...tools.scraper import update_results_with_crawler_data
 from ...configuration import Configuration
 from ...state import State
 
@@ -88,16 +87,5 @@ async def combined_search(
     unique_results = get_unique_results(all_results)
     logger.info(f"Found {len(unique_results)} unique results from {len(all_results)} total results")
     
-    # Step 3: Update unique results with configured crawler
-    try:
-        final_results = await update_results_with_crawler_data(
-            unique_results,
-            configuration
-        )
-        logger.info(f"Successfully updated {len(final_results)} results with crawler")
-        return final_results
-    except Exception as e:
-        for result in unique_results:
-            result['scrape_status'] = 'failure'
-        logger.error(f"Error during crawler update: {str(e)}")
-        return unique_results  # Return unique results without crawler updates if it fails
+    logger.info(f"Returning {len(unique_results)} unique search results")
+    return unique_results

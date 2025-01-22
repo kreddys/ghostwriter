@@ -42,25 +42,5 @@ class InputState:
 class State(InputState):
     """Represents the complete state of the agent, extending InputState with additional attributes."""
     
-    # Raw search results from web search
-    search_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
-    
-    # Results after URL filtering
-    url_filtered_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
-    
-    # Results after uniqueness checking
-    unique_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
-    
-    # Keep existing fields
-    articles: dict[str, list[AIMessage]] = field(default_factory=dict)
-    
-    # Enriched Results of a unique search item
-    enriched_results: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
-
-    search_successful: bool = False
-
-    topic: str = "Amaravati, Andhra Pradesh Capital City"  # Add this field for the configured topic
-
-    is_direct_url: bool = False  # Add this field to indicate direct URL processing
-
-    direct_url: str = ""  # Store the direct URL if provided
+    # Tools will manage their own state variables
+    tool_states: dict[str, Any] = field(default_factory=dict)

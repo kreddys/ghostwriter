@@ -56,8 +56,6 @@ async def tavily_search(
                     "source": "tavily"
                 })
         
-        state.search_results[query] = processed_results
-        
         logger.info(f"Successfully processed {len(processed_results)} Tavily search results")
         return processed_results
         

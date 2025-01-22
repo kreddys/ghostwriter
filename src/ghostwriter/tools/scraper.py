@@ -1,140 +1,164 @@
-"""Utilities for crawling content using multiple configured crawlers."""
+"""Utilities for scraping content using multiple configured scrapers."""
 
 import logging
 from typing import Dict, List, Optional
+from langchain_core.runnables import RunnableConfig
 from ..configuration import Configuration
+from ..state import State
 from ..utils.scrape.firecrawl import firecrawl_scrape_url
-from ..utils.scrape.youtube import crawl_youtube_video
+from ..utils.scrape.youtube import scrape_youtube_video
 
 logger = logging.getLogger(__name__)
 
-# Define crawler mapping here
-CRAWLER_MAPPING = {
+# Define scraper mapping here
+SCRAPER_MAPPING = {
     "firecrawl": firecrawl_scrape_url,
-    "youtube": crawl_youtube_video
+    "youtube": scrape_youtube_video
 }
 
-async def crawl_with_fallback(
+async def scrape_with_fallback(
     url: str, 
     config: Configuration,
-    crawler_mapping: Dict = CRAWLER_MAPPING
+    scraper_mapping: Dict = SCRAPER_MAPPING
 ) -> Optional[Dict]:
     """
-    Attempt to crawl a URL using configured crawlers in sequence.
+    Attempt to scrape a URL using configured scrapers in sequence.
     
     Args:
-        url: The URL to crawl
+        url: The URL to scrape
         config: Configuration object
-        crawler_mapping: Dictionary mapping crawler names to their functions
+        scraper_mapping: Dictionary mapping scraper names to their functions
         
     Returns:
-        Dictionary containing crawled content or None if all crawlers failed
+        Dictionary containing scraped content or None if all scrapers failed
     """
-    active_crawlers = config.crawling_engines
-    if not active_crawlers:  # If empty, use all available crawlers
-        active_crawlers = list(crawler_mapping.keys())
+    active_scrapers = config.scraping_engines
+    if not active_scrapers:  # If empty, use all available scrapers
+        active_scrapers = list(scraper_mapping.keys())
     
-    logger.info(f"Attempting to crawl {url} with crawlers: {active_crawlers}")
+    logger.info(f"Attempting to scrape {url} with scrapers: {active_scrapers}")
     
-    for crawler_name in active_crawlers:
-        crawler_func = crawler_mapping.get(crawler_name)
-        if not crawler_func:
-            logger.warning(f"Unknown crawler: {crawler_name}")
+    for scraper_name in active_scrapers:
+        scraper_func = scraper_mapping.get(scraper_name)
+        if not scraper_func:
+            logger.warning(f"Unknown scraper: {scraper_name}")
             continue
             
         try:
-            logger.info(f"Trying {crawler_name} for URL: {url}")
-            result = await crawler_func(url)
+            logger.info(f"Trying {scraper_name} for URL: {url}")
+            result = await scraper_func(url)
             if result:
-                logger.info(f"Successfully crawled with {crawler_name}")
+                logger.info(f"Successfully scraped with {scraper_name}")
                 return {
                     **result,
-                    "crawler_used": crawler_name,
+                    "scraper_used": scraper_name,
                     "scrape_status": "success"
                 }
-            logger.warning(f"{crawler_name} failed for URL: {url}")
+            logger.warning(f"{scraper_name} failed for URL: {url}")
         except Exception as e:
-            logger.error(f"Error with {crawler_name} for URL {url}: {str(e)}")
+            logger.error(f"Error with {scraper_name} for URL {url}: {str(e)}")
             
-    logger.warning(f"All crawlers failed for URL: {url}")
+    logger.warning(f"All scrapers failed for URL: {url}")
     return {
         "url": url,
         "scrape_status": "failure"
     }
 
-async def crawl_multiple_urls(
+async def scrape_multiple_urls(
     urls: List[str],
     config: Configuration,
-    crawler_mapping: Dict = CRAWLER_MAPPING
+    scraper_mapping: Dict = SCRAPER_MAPPING
 ) -> List[Dict]:
     """
-    Crawl multiple URLs using configured crawlers with fallback logic.
+    Scrape multiple URLs using configured scrapers with fallback logic.
     
     Args:
-        urls: List of URLs to crawl
+        urls: List of URLs to scrape
         config: Configuration object
-        crawler_mapping: Dictionary mapping crawler names to their functions
+        scraper_mapping: Dictionary mapping scraper names to their functions
         
     Returns:
-        List of crawled results (successful and failed)
+        List of scraped results (successful and failed)
     """
     results = []
     
     for url in urls:
-        result = await crawl_with_fallback(url, config, crawler_mapping)
+        result = await scrape_with_fallback(url, config, scraper_mapping)
         results.append(result)
             
     return results
 
-async def update_results_with_crawler_data(
-    results: List[Dict],
-    config: Configuration,
-    crawler_mapping: Dict = CRAWLER_MAPPING
-) -> List[Dict]:
+async def process_scrape(state: State, config: RunnableConfig) -> State:
     """
-    Update search results with crawled content.
+    Process URLs from search results and update with crawled content.
     
     Args:
-        results: List of search results to update
-        config: Configuration object
-        crawler_mapping: Dictionary mapping crawler names to their functions
+        state: Current workflow state containing search_results
+        config: Runnable configuration
         
     Returns:
-        List of updated results
+        Updated state with scraped content
     """
-    # Get URLs to crawl
-    urls = [result.get('url') for result in results if result.get('url')]
+    logger.info("Starting scrape process")
     
-    # Crawl URLs using the utility
-    crawled_data = await crawl_multiple_urls(urls, config, crawler_mapping)
+    # Initialize scraper state
+    if 'scraper' not in state.tool_states:
+        state.tool_states['scraper'] = {
+            'scraped_results': {},
+            'scrape_successful': False
+        }
+    scraper_state = state.tool_states['scraper']
     
-    # Create URL to crawled data mapping
-    crawled_data_map = {data['url']: data for data in crawled_data if data}
+    # Get configuration
+    configuration = Configuration.from_runnable_config(config)
     
-    # Update original results with crawled data
-    updated_results = []
-    for result in results:
-        url = result.get('url')
-        if not url:
-            result['scrape_status'] = 'failure'
-            updated_results.append(result)
+    # Get search results from searcher state
+    searcher_state = state.tool_states.get('searcher', {})
+    search_results = searcher_state.get('search_results', {})
+    
+    # Process each search result
+    for query_key, results in search_results.items():
+        if not results:
             continue
             
-        crawl_result = crawled_data_map.get(url)
-        if crawl_result and crawl_result.get('scrape_status') == 'success':
-            updated_results.append({
-                **result,
-                'title': crawl_result.get('title', result.get('title')),
-                'content': crawl_result.get('content', result.get('content')),
-                'metadata': {
-                    **(result.get('metadata', {})),
-                    **(crawl_result.get('metadata', {}))
-                },
-                'scrape_status': 'success',
-                'crawler_used': crawl_result.get('crawler_used')
-            })
-        else:
-            result['scrape_status'] = 'failure'
-            updated_results.append(result)
-            
-    return updated_results
+        # Get URLs to crawl
+        urls = [result.get('url') for result in results if result.get('url')]
+        
+        # Scrape URLs using the utility
+        scraped_data = await scrape_multiple_urls(urls, configuration)
+        
+        # Create URL to scraped data mapping
+        scraped_data_map = {data['url']: data for data in scraped_data if data}
+        
+        # Update results with scraped content
+        scraped_results = []
+        for result in results:
+            url = result.get('url')
+            if not url:
+                result['scrape_status'] = 'failure'
+                scraped_results.append(result)
+                continue
+                
+            scrape_result = scraped_data_map.get(url)
+            if scrape_result and scrape_result.get('scrape_status') == 'success':
+                scraped_results.append({
+                    **result,
+                    'title': scrape_result.get('title', result.get('title')),
+                    'content': scrape_result.get('content', result.get('content')),
+                    'metadata': {
+                        **(result.get('metadata', {})),
+                        **(scrape_result.get('metadata', {}))
+                    },
+                    'scrape_status': 'success',
+                    'scraper_used': scrape_result.get('scraper_used')
+                })
+            else:
+                result['scrape_status'] = 'failure'
+                scraped_results.append(result)
+                
+        # Store scraped results in scraper state
+        scraper_state['scraped_results'][query_key] = scraped_results
+        scraper_state['scrape_successful'] = True
+        logger.info(f"Successfully scraped {len(scraped_results)} results for query: {query_key}")
+        
+    return state
