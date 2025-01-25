@@ -5,7 +5,6 @@ import json
 import asyncio
 from dotenv import load_dotenv
 from auth.authenticate import Authenticator
-from ghostwriter.utils.unique.lightrag_ui import LightRAGUI
 
 # Load environment variables
 load_dotenv()
@@ -74,12 +73,8 @@ async def call_fastapi(content: str, config: dict):
 def show_app_content():
     st.title("FastAPI Client with Configuration")
     
-    # Initialize LightRAG UI
-    lightrag_ui = LightRAGUI()
-    asyncio.run(lightrag_ui.initialize())
-    
     # Create tabs for different sections
-    tab1, tab2 = st.tabs(["Main Interface", "LightRAG Management"])
+    tab1 = st.tabs(["Main Interface"])[0]
     
     with tab1:
         # Original app content
@@ -158,9 +153,6 @@ def show_app_content():
                 help="Find additional relevant content"
             )
         })
-    
-    with tab2:
-        lightrag_ui.show_management_interface()
     
     if st.button("Submit"):
         with st.spinner("Processing..."):

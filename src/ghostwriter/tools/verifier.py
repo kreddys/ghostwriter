@@ -1,4 +1,4 @@
-"""Tool for checking uniqueness of search results using Pinecone."""
+"""Tool for checking uniqueness of search results using LightRAG."""
 import logging
 from typing import Dict, Annotated
 from langchain_core.runnables import RunnableConfig
@@ -10,7 +10,7 @@ from ..prompts import RELEVANCY_CHECK_PROMPT
 from ..llm import get_llm
 from ..utils.unique.url_filter_supabase import filter_existing_urls
 from ..utils.unique.checker_utils import (
-    init_pinecone_with_ghost_articles,
+    init_lightrag_with_ghost_articles,
     check_result_uniqueness
 )
 
@@ -58,7 +58,7 @@ async def uniqueness_checker(
     state: State,
     config: Annotated[RunnableConfig, InjectedToolArg()]
 ) -> State:
-    """Filter and return unique search results using Pinecone and check topic relevancy."""
+    """Filter and return unique search results using LightRAG and check topic relevancy."""
     logger.info("=== Starting Uniqueness Checker ===")
     
     # Initialize checker state
@@ -116,8 +116,8 @@ async def uniqueness_checker(
         use_url_filtering = configuration.use_url_filtering
         model = get_llm(configuration, temperature=0.3)
         
-        logger.info("Initializing Pinecone vector store...")
-        vector_store = await init_pinecone_with_ghost_articles()
+        logger.info("Initializing LightRAG knowledge store...")
+        rag = await init_lightrag_with_ghost_articles()
         
         unique_results = {}
         total_processed = 0
@@ -152,7 +152,7 @@ async def uniqueness_checker(
                 logger.info(f"\nProcessing result {total_processed}: {url}")
                 
                 # Check uniqueness with detailed results
-                uniqueness_result = check_result_uniqueness(result, vector_store, configuration)
+                uniqueness_result = check_result_uniqueness(result, rag, configuration)
                 is_unique = uniqueness_result['is_unique']
                 similarity_score = uniqueness_result.get('similarity_score', 0)
                 similar_url = uniqueness_result.get('similar_url', '')

@@ -1,6 +1,8 @@
 volumes:
   langgraph-data:
     driver: local
+  lightrag-data:
+    driver: local
 services:
   langgraph-redis:
     image: redis:6
@@ -47,6 +49,7 @@ services:
       STORE_CONFIG: '{"index": {"embed": "openai:text-embedding-3-small", "dims": 1536}}'
     volumes:
       - ./src:/app/src
+      - lightrag-data:/app/lightrag_ghost_data
       #LOG_LEVEL: debug
 
   fastapi-wrapper:

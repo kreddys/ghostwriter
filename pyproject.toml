@@ -26,8 +26,9 @@ dependencies = [
     "uvicorn>=0.29.0",
     "streamlit-authenticator>=0.4.1",
     "youtube-transcript-api>=0.6.1",
+    "lightrag-hku @ file://src/lightrag",
+    "networkx>=3.2.1",
 ]
-
 
 [project.optional-dependencies]
 dev = ["mypy>=1.11.1", "ruff>=0.6.1"]
@@ -40,7 +41,6 @@ build-backend = "setuptools.build_meta"
 packages = ["ghostwriter"]
 [tool.setuptools.package-dir]
 "ghostwriter" = "src/ghostwriter"
-
 
 [tool.setuptools.package-data]
 "*" = ["py.typed"]

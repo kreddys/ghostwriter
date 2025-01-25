@@ -1,32 +1,21 @@
-"""Utility functions for uniqueness checking."""
+"""Utility functions for uniqueness checking using LightRAG."""
 import logging
 import os
 from typing import Dict
-from langchain_pinecone import PineconeEmbeddings, PineconeVectorStore
-from langchain.text_splitter import TokenTextSplitter
-from pinecone import Pinecone
+from ghostwriter.utils.unique.lightrag_ui import LightRAG, QueryParam
 from ghostwriter.configuration import Configuration
 from ghostwriter.utils.publish.api import fetch_ghost_articles
 
 logger = logging.getLogger(__name__)
 
-async def init_pinecone_with_ghost_articles():
-    """Initialize Pinecone client and index, and populate with Ghost articles."""
-    if not os.getenv("PINECONE_API_KEY"):
-        raise ValueError("PINECONE_API_KEY environment variable not set")
+async def init_lightrag_with_ghost_articles():
+    """Initialize LightRAG and populate with Ghost articles."""
+    WORKING_DIR = "./lightrag_ghost_data"
     
-    pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-    index_name = os.getenv("PINECONE_INDEX_NAME")
-    
-    logger.info(f"Initializing Pinecone with index: {index_name}")
-    
-    existing_indexes = [index_info["name"] for index_info in pc.list_indexes()]
-    if index_name not in existing_indexes:
-        raise ValueError(f"Index {index_name} does not exist in Pinecone")
-    
-    index = pc.Index(index_name)
-    embeddings = PineconeEmbeddings(model="multilingual-e5-large")
-    vector_store = PineconeVectorStore(index=index, embedding=embeddings)
+    if not os.path.exists(WORKING_DIR):
+        os.mkdir(WORKING_DIR)
+
+    rag = LightRAG(working_dir=WORKING_DIR)
     
     try:
         ghost_url = os.getenv("GHOST_APP_URL")
@@ -34,7 +23,7 @@ async def init_pinecone_with_ghost_articles():
         
         if not all([ghost_url, ghost_api_key]):
             logger.warning("Ghost credentials not configured, skipping article fetch")
-            return vector_store
+            return rag
             
         articles = await fetch_ghost_articles(ghost_url, ghost_api_key)
         logger.info(f"Fetched {len(articles)} articles from Ghost")
@@ -42,37 +31,32 @@ async def init_pinecone_with_ghost_articles():
         for article in articles:
             try:
                 content = f"Title: {article.title}\nContent: {article.content}"
-                metadata = {
+                rag.insert(content, metadata={
                     "url": article.url,
                     "title": article.title,
                     "id": article.id,
                     "source": "ghost"
-                }
-                
-                vector_store.add_texts(
-                    texts=[content],
-                    metadatas=[metadata],
-                    ids=[article.id]
-                )
+                })
                 logger.debug(f"Stored Ghost article: {article.title}")
                 
             except Exception as e:
                 logger.error(f"Error storing article {article.title}: {str(e)}")
                 continue
                 
-        logger.info("Completed storing Ghost articles in Pinecone")
+        logger.info("Completed storing Ghost articles in LightRAG")
         
     except Exception as e:
         logger.error(f"Error fetching/storing Ghost articles: {str(e)}")
         
-    return vector_store
+    return rag
 
 def check_result_uniqueness(
     result: Dict, 
-    vector_store: PineconeVectorStore,
-    configuration: Configuration
+    rag: LightRAG,
+    configuration: Configuration,
+    conversation_history=None
 ) -> dict:
-    """Check if a search result is unique against Pinecone database."""
+    """Check if a search result is unique against LightRAG knowledge store."""
     url = result.get('url', 'No URL')
     title = result.get('title', 'No title')
     similarity_threshold = configuration.similarity_threshold
@@ -91,48 +75,48 @@ def check_result_uniqueness(
             'reason': 'Missing content'
         }
 
-    text_splitter = TokenTextSplitter(chunk_size=500, chunk_overlap=50)
-    
     try:
         content = result.get('content', '')
-        content_chunks = text_splitter.split_text(content)
-        logger.info(f"Split content into {len(content_chunks)} chunks for {url}")
-
-        for i, chunk in enumerate(content_chunks):
-            logger.debug(f"Checking chunk {i+1}/{len(content_chunks)} for {url}")
+        
+        # Use hybrid search mode for better context understanding
+        query_param = QueryParam(
+            mode="hybrid",
+            conversation_history=conversation_history,
+            history_turns=3 if conversation_history else 0
+        )
+        
+        # Query the RAG store with the content
+        similar_results = rag.query(content, param=query_param)
+        
+        if similar_results:
+            most_similar = similar_results[0]
+            similarity_score = most_similar.get('score', 1.0)
+            similar_url = most_similar.get('metadata', {}).get('url', 'No URL')
             
-            similar_results = vector_store.similarity_search_with_score(chunk, k=1)
+            logger.info(f"Similarity score: {similarity_score}")
+            logger.info(f"Similar document URL: {similar_url}")
             
-            if similar_results:
-                most_similar_doc, similarity_score = similar_results[0]
-                similar_url = most_similar_doc.metadata.get('url', 'No URL')
-                logger.info(f"Chunk {i+1} similarity score: {similarity_score}")
-                logger.info(f"Similar document URL: {similar_url}")
-                
-                if similarity_score <= similarity_threshold:
-                    logger.info(f"Found unique chunk for {url} (score: {similarity_score})")
-                    return {
-                        'is_unique': True,
-                        'similarity_score': similarity_score,
-                        'similar_url': similar_url,
-                        'reason': f"Unique chunk found (score: {similarity_score})"
-                    }
-            else:
-                logger.info(f"No similar documents found for chunk {i+1} of {url}")
+            if similarity_score <= similarity_threshold:
                 return {
                     'is_unique': True,
-                    'similarity_score': 0.0,
-                    'similar_url': '',
-                    'reason': 'No similar documents found'
+                    'similarity_score': similarity_score,
+                    'similar_url': similar_url,
+                    'reason': f"Content is unique (score: {similarity_score})"
                 }
-
-        logger.info(f"Content not unique for {url}")
-        return {
-            'is_unique': False,
-            'similarity_score': similarity_score,
-            'similar_url': similar_url,
-            'reason': f"Content not unique (score: {similarity_score})"
-        }
+            else:
+                return {
+                    'is_unique': False,
+                    'similarity_score': similarity_score,
+                    'similar_url': similar_url,
+                    'reason': f"Content not unique (score: {similarity_score})"
+                }
+        else:
+            return {
+                'is_unique': True,
+                'similarity_score': 0.0,
+                'similar_url': '',
+                'reason': 'No similar documents found'
+            }
 
     except Exception as e:
         logger.error(f"Error checking uniqueness for {url}: {str(e)}", exc_info=True)
