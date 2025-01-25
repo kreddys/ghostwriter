@@ -9,7 +9,7 @@ from langchain_core.runnables import RunnableConfig
 from ..prompts import ARTICLE_WRITER_PROMPT
 from ..state import State
 from ..configuration import Configuration
-from ghostwriter.utils.ghost.api import fetch_ghost_tags
+from ghostwriter.utils.publish.api import fetch_ghost_tags
 from ..llm import get_llm 
 
 logger = logging.getLogger(__name__)

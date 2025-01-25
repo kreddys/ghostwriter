@@ -6,7 +6,7 @@ from langchain_pinecone import PineconeEmbeddings, PineconeVectorStore
 from langchain.text_splitter import TokenTextSplitter
 from pinecone import Pinecone
 from ghostwriter.configuration import Configuration
-from ghostwriter.utils.ghost.api import fetch_ghost_articles
+from ghostwriter.utils.publish.api import fetch_ghost_articles
 
 logger = logging.getLogger(__name__)
 

@@ -3,11 +3,11 @@ import logging
 from langgraph.graph import StateGraph, END
 from ghostwriter.state import State, InputState
 from ghostwriter.agents.article_writer import article_writer_agent
-from ghostwriter.tools.checker import uniqueness_checker
+from ghostwriter.tools.verifier import uniqueness_checker
 from ghostwriter.tools.searcher import process_search
 from ghostwriter.tools.scraper import process_scrape
 from ghostwriter.tools.publisher import publish_to_ghost
-from ghostwriter.tools.notify import notify
+from ghostwriter.tools.notifier import notify
 from typing import Literal
 
 logger = logging.getLogger(__name__)
