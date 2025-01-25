@@ -1,113 +1,98 @@
 """Streamlit UI components for LightRAG document management."""
 import os
 import streamlit as st
-import asyncio
-from lightrag import LightRAG
-from ghostwriter.utils.publish.api import fetch_ghost_articles
+import subprocess
+from pathlib import Path
 
 class LightRAGUI:
     def __init__(self):
         self.working_dir = os.getenv("LIGHTRAG_WORKING_DIR", "./lightrag_data")
+        self.cli_path = str(Path(__file__).parent / "lightrag_cli.py")
         self.rag = None
-        
+
     async def initialize(self):
-        """Initialize LightRAG instance"""
-        if self.rag is None:
-            self.rag = LightRAG(
-                working_dir=self.working_dir,
-                log_level="INFO",
-                embedding_func=EmbeddingFunc(
-                    embedding_dim=1536,
-                    max_token_size=8192,
-                    func="openai_embed"
-                ),
-                addon_params={
-                    "insert_batch_size": 20,
-                    "entity_types": ["organization", "person", "location", "event"]
-                }
-            )
-        return self.rag
+        """Initialize the LightRAG instance"""
+        return True
 
-    async def sync_ghost_articles(self):
-        """Sync Ghost articles to LightRAG"""
-        ghost_url = os.getenv("GHOST_APP_URL")
-        ghost_api_key = os.getenv("GHOST_API_KEY")
-        
-        if not all([ghost_url, ghost_api_key]):
-            st.error("Ghost credentials not configured")
-            return False
-            
-        with st.spinner("Fetching Ghost articles..."):
-            articles = await fetch_ghost_articles(ghost_url, ghost_api_key)
-            if not articles:
-                st.error("No articles found in Ghost")
+    def _run_cli_command(self, command: str):
+        """Run a CLI command and return the output"""
+        try:
+            result = subprocess.run(
+                ["python", self.cli_path, command],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                st.error(f"Command failed: {result.stderr}")
                 return False
-                
-            article_contents = []
-            for article in articles:
-                content = f"Title: {article.title}\nContent: {article.content}"
-                article_contents.append(content)
-                
-            with st.spinner("Storing articles in LightRAG..."):
-                self.rag.insert(article_contents)
-                st.success(f"Successfully stored {len(articles)} articles in LightRAG")
-                return True
+            return result.stdout
+        except Exception as e:
+            st.error(f"Error running command: {str(e)}")
+            return False
 
-    def show_upload_interface(self):
-        """Show document upload interface"""
-        with st.expander("Upload Documents"):
-            uploaded_files = st.file_uploader(
-                "Upload documents (PDF, DOCX, TXT)",
-                type=["pdf", "docx", "txt"],
-                accept_multiple_files=True
-            )
+    def sync_ghost_articles(self):
+        """Sync Ghost articles to LightRAG using CLI"""
+        with st.spinner("Syncing Ghost articles..."):
+            result = self._run_cli_command("sync-ghost")
+            if result:
+                st.success("Successfully synced Ghost articles")
+                return True
+            return False
+
+    def check_duplicate_content(self, content: str) -> bool:
+        """
+        Check if content already exists in the knowledge store.
+        """
+        # Save content to temp file
+        temp_path = Path(self.working_dir) / "temp_content.txt"
+        try:
+            with open(temp_path, "w") as f:
+                f.write(content)
             
-            if uploaded_files:
-                with st.spinner("Processing documents..."):
-                    try:
-                        documents = []
-                        for file in uploaded_files:
-                            if file.type == "application/pdf":
-                                import PyPDF2
-                                reader = PyPDF2.PdfReader(file)
-                                text = "\n".join([page.extract_text() for page in reader.pages])
-                            elif file.type == "text/plain":
-                                text = file.read().decode("utf-8")
-                            else:
-                                # Handle DOCX files
-                                from docx import Document
-                                doc = Document(file)
-                                text = "\n".join([para.text for para in doc.paragraphs])
-                                
-                            documents.append(text)
-                        
-                        self.rag.insert(documents)
-                        st.success(f"Successfully stored {len(documents)} documents")
-                        return True
-                    except Exception as e:
-                        st.error(f"Error processing documents: {str(e)}")
-                        return False
-        return None
+            # Run CLI command to check duplicates
+            result = self._run_cli_command(f"check-duplicate --file {temp_path}")
+            if result and "Duplicate content found" in result:
+                return True
+            return False
+        except Exception as e:
+            st.error(f"Error checking duplicates: {str(e)}")
+            return False
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
 
     def show_management_interface(self):
         """Show LightRAG document management interface"""
         st.title("LightRAG Knowledge Store")
         
-        # Initialize LightRAG if not already initialized
-        if self.rag is None:
-            st.warning("LightRAG not initialized")
-            return
-            
+        # Check new content
+        with st.expander("Check for Duplicate Content"):
+            new_content = st.text_area("Paste new content to check for duplicates")
+            if st.button("Check for Duplicates"):
+                if new_content:
+                    with st.spinner("Checking for duplicates..."):
+                        is_duplicate = self.check_duplicate_content(new_content)
+                        if is_duplicate:
+                            st.error("Duplicate content found!")
+                        else:
+                            st.success("No duplicates found - content is unique")
+                else:
+                    st.warning("Please enter some content to check")
+        
         # Sync Ghost articles
         with st.expander("Sync Ghost Articles"):
             if st.button("Sync Ghost Articles"):
-                asyncio.run(self.sync_ghost_articles())
+                if self.sync_ghost_articles():
+                    st.success("Ghost articles synced successfully")
+                else:
+                    st.error("Failed to sync Ghost articles")
                 
-        # Upload custom documents
-        self.show_upload_interface()
-        
         # View stored documents
         with st.expander("View Stored Documents"):
             if st.button("Refresh Document List"):
-                # TODO: Implement document listing functionality
-                st.info("Document listing functionality coming soon")
+                result = self._run_cli_command("list-documents")
+                if result:
+                    st.write("Stored Documents:")
+                    st.code(result)
+                else:
+                    st.info("No documents found")
