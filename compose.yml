@@ -1,8 +1,6 @@
 volumes:
   langgraph-data:
     driver: local
-  lightrag-data:
-    driver: local
 services:
   langgraph-redis:
     image: redis:6
@@ -27,6 +25,25 @@ services:
       timeout: 1s
       retries: 5
       interval: 5s
+  lightrag-api:
+    build:
+      context: ../lightrag_pinecone_embed
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-9621}:9621"
+    env_file:
+      - .env
+    environment:
+      - TZ=UTC
+    volumes:
+      - ./data/rag_storage:/app/data/rag_storage
+      - ./data/inputs:/app/data/inputs
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://lightrag-api:9621/health" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
   langgraph-api:
     build:
       context: .
@@ -37,6 +54,8 @@ services:
       langgraph-redis:
         condition: service_healthy
       langgraph-postgres:
+        condition: service_healthy
+      lightrag-api:
         condition: service_healthy
     env_file:
       - .env
@@ -49,8 +68,6 @@ services:
       STORE_CONFIG: '{"index": {"embed": "openai:text-embedding-3-small", "dims": 1536}}'
     volumes:
       - ./src:/app/src
-      - lightrag-data:/app/lightrag_ghost_data
-      #LOG_LEVEL: debug
 
   fastapi-wrapper:
     build:

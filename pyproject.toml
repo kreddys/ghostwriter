@@ -26,8 +26,6 @@ dependencies = [
     "uvicorn>=0.29.0",
     "streamlit-authenticator>=0.4.1",
     "youtube-transcript-api>=0.6.1",
-    "lightrag-hku @ file://src/lightrag",
-    "networkx>=3.2.1",
 ]
 
 [project.optional-dependencies]

@@ -1,12 +1,27 @@
-"""Utility functions for uniqueness checking using LightRAG."""
 import logging
 import os
-from typing import Dict
-from ghostwriter.utils.unique.lightrag_ui import LightRAG, QueryParam
+from typing import Dict, Optional
 from ghostwriter.configuration import Configuration
 from ghostwriter.utils.publish.api import fetch_ghost_articles
 
 logger = logging.getLogger(__name__)
+
+# Placeholder for LightRAG functionality
+class LightRAGPlaceholder:
+    """Placeholder for LightRAG functionality."""
+    def __init__(self, working_dir: Optional[str] = None):
+        self.working_dir = working_dir
+        self.knowledge_store = []
+
+    def insert(self, content: str, metadata: Dict):
+        """Placeholder for inserting content into LightRAG."""
+        logger.debug(f"Mocked insert: Storing content with metadata {metadata}")
+        self.knowledge_store.append({"content": content, "metadata": metadata})
+
+    def query(self, content: str, param: Optional[Dict] = None):
+        """Placeholder for querying LightRAG."""
+        logger.debug(f"Mocked query: Searching for content similar to '{content[:50]}...'")
+        return []
 
 async def init_lightrag_with_ghost_articles():
     """Initialize LightRAG and populate with Ghost articles."""
@@ -15,7 +30,7 @@ async def init_lightrag_with_ghost_articles():
     if not os.path.exists(WORKING_DIR):
         os.mkdir(WORKING_DIR)
 
-    rag = LightRAG(working_dir=WORKING_DIR)
+    rag = LightRAGPlaceholder(working_dir=WORKING_DIR)
     
     try:
         ghost_url = os.getenv("GHOST_APP_URL")
@@ -52,7 +67,7 @@ async def init_lightrag_with_ghost_articles():
 
 def check_result_uniqueness(
     result: Dict, 
-    rag: LightRAG,
+    rag: LightRAGPlaceholder,
     configuration: Configuration,
     conversation_history=None
 ) -> dict:
@@ -78,15 +93,8 @@ def check_result_uniqueness(
     try:
         content = result.get('content', '')
         
-        # Use hybrid search mode for better context understanding
-        query_param = QueryParam(
-            mode="hybrid",
-            conversation_history=conversation_history,
-            history_turns=3 if conversation_history else 0
-        )
-        
-        # Query the RAG store with the content
-        similar_results = rag.query(content, param=query_param)
+        # Mock query to LightRAG
+        similar_results = rag.query(content)
         
         if similar_results:
             most_similar = similar_results[0]
