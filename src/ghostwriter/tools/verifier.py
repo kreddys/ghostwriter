@@ -1,64 +1,22 @@
 """Tool for checking uniqueness of search results using LightRAG."""
 import logging
+import requests
+import json
+import re
 from typing import Dict, Annotated
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
-from langchain_core.messages import SystemMessage
 from ..state import State
 from ..configuration import Configuration
-from ..prompts import RELEVANCY_CHECK_PROMPT 
-from ..llm import get_llm
 from ..utils.unique.url_filter_supabase import filter_existing_urls
-from ..utils.unique.checker_utils import (
-    init_lightrag_with_ghost_articles,
-    check_result_uniqueness
-)
 
 logger = logging.getLogger(__name__)
-
-async def check_content_relevancy(content: dict, topic: str, model) -> dict:
-    """Check if content is relevant to the specified topic using LLM."""
-    url = content.get('url', 'No URL')
-    title = content.get('title', 'No title')
-    
-    logger.info(f"Checking relevancy for URL: {url}")
-    logger.info(f"Title: {title}")
-    logger.info(f"Topic: {topic}")
-    
-    try:
-        messages = [
-            SystemMessage(
-                content=RELEVANCY_CHECK_PROMPT.format(
-                    topic=topic,
-                    title=title,
-                    content=content.get('content', 'N/A')
-                )
-            )
-        ]
-        
-        response = await model.ainvoke(messages)
-        response_text = response.content.lower()
-        is_relevant = response_text.startswith('relevant')
-        reason = response_text.split(':', 1)[1].strip() if ':' in response_text else ''
-        
-        logger.info(f"Relevancy check result for {url}: {'RELEVANT' if is_relevant else 'NOT RELEVANT'} - {reason}")
-        return {
-            'is_relevant': is_relevant,
-            'reason': reason
-        }
-        
-    except Exception as e:
-        logger.error(f"Error in relevancy check for {url}: {str(e)}")
-        return {
-            'is_relevant': False,
-            'reason': f"Error: {str(e)}"
-        }
 
 async def uniqueness_checker(
     state: State,
     config: Annotated[RunnableConfig, InjectedToolArg()]
 ) -> State:
-    """Filter and return unique search results using LightRAG and check topic relevancy."""
+    """Filter and return unique search results using LightRAG."""
     logger.info("=== Starting Uniqueness Checker ===")
     
     # Initialize checker state
@@ -114,15 +72,10 @@ async def uniqueness_checker(
             
         configuration = Configuration.from_runnable_config(config)
         use_url_filtering = configuration.use_url_filtering
-        model = get_llm(configuration, temperature=0.3)
-        
-        logger.info("Initializing LightRAG knowledge store...")
-        rag = await init_lightrag_with_ghost_articles()
         
         unique_results = {}
         total_processed = 0
         total_unique = 0
-        total_relevant = 0
         
         logger.info(f"\n=== Processing {len(scraped_results)} Queries ===")
         for query, results in scraped_results.items():
@@ -144,66 +97,38 @@ async def uniqueness_checker(
             
             source_unique_results = []
             
-            logger.info(f"Processing {len(filtered_results)} results...")
-            for result in filtered_results:
-                total_processed += 1
-                url = result.get('url', 'No URL')
+            # Split results into chunks
+            chunks = create_chunks(filtered_results, chunk_size=5, min_content_length=100)
+            logger.info(f"Created {len(chunks)} chunks for query: {query}")
+            
+            # Process each chunk
+            for chunk in chunks:
+                logger.info(f"Processing chunk with {len(chunk)} results")
                 
-                logger.info(f"\nProcessing result {total_processed}: {url}")
+                # Check uniqueness for the entire chunk using LightRAG
+                chunk_uniqueness = await check_chunk_uniqueness(chunk, configuration)
+                if not chunk_uniqueness['is_unique']:
+                    logger.info(f"✗ Chunk rejected (not unique): {chunk_uniqueness['reason']}")
+                    continue
                 
-                # Check uniqueness with detailed results
-                uniqueness_result = check_result_uniqueness(result, rag, configuration)
-                is_unique = uniqueness_result['is_unique']
-                similarity_score = uniqueness_result.get('similarity_score', 0)
-                similar_url = uniqueness_result.get('similar_url', '')
-                
-                decision_details = {
-                    'url': result.get('url'),
-                    'title': result.get('title'),
-                    'similarity_score': similarity_score,
-                    'similar_url': similar_url,
-                    'threshold': configuration.similarity_threshold
-                }
-                
-                if is_unique:
+                # If chunk is unique, add all results in the chunk to unique_results
+                for result in chunk:
+                    total_processed += 1
+                    url = result.get('url', 'No URL')
+                    logger.info(f"✓ Accepted: {url} (unique)")
+                    source_unique_results.append(result)
                     total_unique += 1
-                    logger.info(f"Result is unique (score: {similarity_score}) - checking relevancy...")
                     
-                    # Check relevancy with detailed results
-                    relevancy_result = await check_content_relevancy(result, configuration.topic, model)
-                    is_relevant = relevancy_result['is_relevant']
-                    relevancy_reason = relevancy_result.get('reason', '')
-                    
-                    decision_details.update({
-                        'is_relevant': is_relevant,
-                        'relevancy_reason': relevancy_reason
-                    })
-                    
-                    if is_relevant:
-                        total_relevant += 1
-                        source_unique_results.append(result)
-                        logger.info("✓ Result accepted (unique and relevant)")
-                    else:
-                        logger.info(f"✗ Result rejected (not relevant): {relevancy_reason}")
-                        checker_state['non_unique_results'].setdefault(query, []).append({
-                            'result': result,
-                            'reason': f"Not relevant: {relevancy_reason}",
-                            'details': decision_details
-                        })
-                else:
-                    logger.info(f"✗ Result rejected (not unique). Similar to: {similar_url} (score: {similarity_score})")
-                    checker_state['non_unique_results'].setdefault(query, []).append({
-                        'result': result,
-                        'reason': f"Not unique. Similar to: {similar_url} (score: {similarity_score})",
-                        'details': decision_details
-                    })
-                
-                # Store decision details
-                checker_state['decision_details'][result.get('url')] = decision_details
+                    # Store decision details
+                    checker_state['decision_details'][url] = {
+                        'url': url,
+                        'title': result.get('title', 'No title'),
+                        'is_unique': True,
+                        'reason': chunk_uniqueness.get('reason', '')
+                    }
             
             if source_unique_results:
                 unique_results[query] = source_unique_results
-                logger.info(f"Stored {len(source_unique_results)} unique results for query")
         
         # Update checker state
         checker_state['unique_results'] = unique_results
@@ -212,8 +137,7 @@ async def uniqueness_checker(
         logger.info("\n=== Uniqueness Checker Summary ===")
         logger.info(f"Total results processed: {total_processed}")
         logger.info(f"Unique results found: {total_unique}")
-        logger.info(f"Relevant results found: {total_relevant}")
-        logger.info(f"Final unique and relevant results: {sum(len(results) for results in unique_results.values())}")
+        logger.info(f"Final unique results: {sum(len(results) for results in unique_results.values())}")
         logger.info("=== Uniqueness Checker Completed ===")
 
         return state
@@ -222,3 +146,95 @@ async def uniqueness_checker(
         logger.error(f"Error in uniqueness checker: {str(e)}")
         checker_state['check_successful'] = False
         raise
+
+def create_chunks(
+    results: list,
+    chunk_size: int = 5,
+    min_content_length: int = 100
+) -> list:
+    """
+    Split results into chunks using a comprehensive strategy.
+    
+    Args:
+        results: List of results to chunk.
+        chunk_size: Maximum number of results per chunk.
+        min_content_length: Minimum content length for a chunk to be valid.
+    
+    Returns:
+        List of chunks, where each chunk is a list of results.
+    """
+    chunks = []
+    current_chunk = []
+    current_chunk_content_length = 0
+    
+    for result in results:
+        content = result.get('content', '')
+        content_length = len(content)
+        
+        # If adding this result would exceed the chunk size or content length limit,
+        # finalize the current chunk and start a new one
+        if (len(current_chunk) >= chunk_size or
+            current_chunk_content_length + content_length > min_content_length):
+            chunks.append(current_chunk)
+            current_chunk = []
+            current_chunk_content_length = 0
+        
+        current_chunk.append(result)
+        current_chunk_content_length += content_length
+    
+    # Add the last chunk if it's not empty
+    if current_chunk:
+        chunks.append(current_chunk)
+    
+    return chunks
+
+async def check_chunk_uniqueness(
+    chunk: list,
+    configuration: Configuration
+) -> dict:
+    """Check if a chunk of results is unique using LightRAG."""
+    try:
+        # Combine chunk content into a single string for LightRAG query
+        chunk_content = "\n".join([result.get('content', '') for result in chunk])
+        
+        # Query LightRAG to check uniqueness of the chunk
+        query_data = {
+            "query": f"Is the following content not covered and unique in the knowledge base? Content: {chunk_content}",
+            "mode": "hybrid",
+            "stream": False,
+            "only_need_context": False
+        }
+        
+        response = requests.post(
+            "http://localhost:9621/query",  # Local LightRAG API endpoint
+            headers={"Content-Type": "application/json"},  # Only content type header is needed
+            json=query_data  # Payload for the request
+        )
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        
+        # Parse LightRAG response
+        rag_response = response.json()
+        response_text = rag_response.get('response', '')
+        
+        # Extract JSON string from Markdown code block
+        json_match = re.search(r'```json\n({.*?})\n```', response_text, re.DOTALL)
+        if not json_match:
+            raise ValueError("Failed to extract JSON from LightRAG response.")
+        
+        # Parse the extracted JSON string
+        uniqueness_info = json.loads(json_match.group(1))
+        
+        is_unique = uniqueness_info.get('is_unique', False)
+        reason = uniqueness_info.get('reason', 'No reason provided')
+        
+        return {
+            'is_unique': is_unique,
+            'reason': reason
+        }
+        
+    except Exception as e:
+        logger.error(f"Error checking chunk uniqueness: {str(e)}")
+        return {
+            'is_unique': False,
+            'reason': f"Error: {str(e)}"
+        }

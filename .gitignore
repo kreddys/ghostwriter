@@ -171,3 +171,4 @@ ssh.key.pub
 client_secret.json
 
 lightrag_ghost_data/
+.langgraph_api/
