@@ -10,6 +10,7 @@ from langchain_core.tools import InjectedToolArg
 from ..state import State
 from ..configuration import Configuration
 from ..utils.unique.url_filter_supabase import filter_existing_urls
+from ..prompts import CONTENT_VERIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,7 @@ async def check_uniqueness(
         
         # Query LightRAG to check uniqueness of the combined content
         query_data = {
-            "query": f"Check if the following content is already present in the knowledge base. Must always Return a JSON response with 'is_present' (boolean) and 'reason' (string) fields. Content: {combined_content}",
+            "query": CONTENT_VERIFICATION_PROMPT.format(combined_content=combined_content),
             "mode": "hybrid",
             "stream": False,
             "only_need_context": False,
@@ -161,19 +162,18 @@ async def check_uniqueness(
         if not json_match:
             raise ValueError("Failed to extract JSON from LightRAG response.")
         
-        # Parse the extracted JSON string
         uniqueness_info = json.loads(json_match.group(1))
-        
-        # Ensure the response has the expected fields
-        if not all(key in uniqueness_info for key in ['is_present', 'reason']):
-            raise ValueError("API response is missing required fields: 'is_present' or 'reason'.")
-        
-        is_present = uniqueness_info['is_present']
-        reason = uniqueness_info['reason']
-        
+
+        # Ensure the response has all expected fields
+        required_fields = ['is_present', 'reason', 'new_content', 'summary']
+        if not all(key in uniqueness_info for key in required_fields):
+            raise ValueError("API response is missing required fields")
+
         return {
-            'is_unique': not is_present,  # Invert is_present to get is_unique
-            'reason': reason
+            'is_unique': not uniqueness_info['is_present'],
+            'reason': uniqueness_info['reason'],
+            'new_content': uniqueness_info['new_content'],
+            'summary': uniqueness_info['summary']
         }
         
     except Exception as e:

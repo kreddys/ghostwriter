@@ -42,22 +42,13 @@ def clean_content(content: str) -> str:
 async def firecrawl_scrape_url(url: str) -> Optional[Dict]:
     """
     Scrape content from a URL using Firecrawl API.
-    
-    Args:
-        url (str): The URL to scrape
-        
-    Returns:
-        Optional[Dict]: Dictionary containing Firecrawl-specific scraped content or None if failed
-        
-    Raises:
-        ValueError: If required Firecrawl configuration is missing
+    Returns data in standardized format.
     """
     api_key = os.getenv("FIRECRAWL_API_KEY")
     if not api_key:
         logger.error("FIRECRAWL_API_KEY environment variable not set")
         raise ValueError("Firecrawl API key is required")
 
-    # Allow custom Firecrawl endpoint configuration
     api_url = os.getenv("FIRECRAWL_API_URL", "https://api.firecrawl.dev/v1/scrape")
     headers = {
         "Content-Type": "application/json",
@@ -86,30 +77,23 @@ async def firecrawl_scrape_url(url: str) -> Optional[Dict]:
                     logger.error(f"Firecrawl API returned error: {data}")
                     return None
                 
-                # Extract relevant data from response
                 content_data = data.get("data", {})
                 metadata = content_data.get("metadata", {})
                 
-                # Clean the content before returning
                 raw_content = content_data.get("markdown", "No content available")
                 cleaned_content = clean_content(raw_content)
                 
-                result = {
+                return {
                     "url": url,
                     "title": metadata.get("title", "No Title"),
-                    "content": cleaned_content,  # Use cleaned content
-                    "source": "direct_input",
+                    "content": cleaned_content,
+                    "source": "firecrawl",
                     "metadata": {
                         "description": metadata.get("description", ""),
                         "language": metadata.get("language", ""),
-                        "og_title": metadata.get("ogTitle", ""),
-                        "og_description": metadata.get("ogDescription", ""),
                         "status_code": metadata.get("statusCode", 0)
                     }
                 }
-                
-                logger.info(f"Successfully scraped and cleaned content from URL: {url}")
-                return result
                 
     except Exception as e:
         logger.error(f"Error scraping URL {url}: {str(e)}")

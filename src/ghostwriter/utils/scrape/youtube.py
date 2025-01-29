@@ -21,7 +21,7 @@ def get_video_id(url: str) -> Optional[str]:
     return None
 
 async def scrape_youtube_video(url: str) -> Optional[Dict[str, str]]:
-    """Crawl a YouTube video and return its transcript in Firecrawl format."""
+    """Crawl a YouTube video and return its transcript in standardized format."""
     if not is_youtube_url(url):
         return None
         
@@ -37,37 +37,29 @@ async def scrape_youtube_video(url: str) -> Optional[Dict[str, str]]:
         try:
             transcript = transcript_list.find_transcript(['en'])
         except:
-            # If English not available, use first available transcript
             transcript = next(iter(transcript_list))
             
         # Fetch and format transcript
         transcript_data = transcript.fetch()
         content = " ".join([t['text'] for t in transcript_data])
         
-        # If transcript is not in English, add language info to metadata
-        if transcript.language_code != 'en':
+        # If transcript is not in English, add language info
+        language = transcript.language_code
+        if language != 'en':
             content = f"[Transcript in {transcript.language}] {content}"
         
         return {
-            'url': url,
-            'content': content,
-            'markdown': content,  # Same as content since we don't have HTML
-            'metadata': {
-                'source': 'youtube',
-                'video_id': video_id,
-                'language': 'en'
-            },
-            'status': 'success'
+            "url": url,
+            "title": f"YouTube Video ({video_id})",  # Added title field
+            "content": content,
+            "source": "youtube",
+            "metadata": {
+                "description": "",  # YouTube API would be needed for this
+                "language": language,
+                "video_id": video_id,
+                "status_code": 200 if content else 0
+            }
         }
     except Exception as e:
         logger.error(f"Failed to crawl YouTube video {url}: {str(e)}")
-        return {
-            'url': url,
-            'content': '',
-            'markdown': '',
-            'metadata': {
-                'source': 'youtube',
-                'error': str(e)
-            },
-            'status': 'failure'
-        }
+        return None

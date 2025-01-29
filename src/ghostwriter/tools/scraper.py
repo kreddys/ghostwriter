@@ -22,7 +22,9 @@ async def scrape_with_fallback(
     scraper_mapping: Dict = SCRAPER_MAPPING
 ) -> Optional[Dict]:
     """
-    Attempt to scrape a URL using configured scrapers in sequence.
+    Attempt to scrape a URL using configured scrapers.
+    For YouTube URLs, uses only YouTube scraper.
+    For non-YouTube URLs, tries all active scrapers except YouTube.
     
     Args:
         url: The URL to scrape
@@ -32,33 +34,60 @@ async def scrape_with_fallback(
     Returns:
         Dictionary containing scraped content or None if all scrapers failed
     """
-    active_scrapers = config.scraping_engines
-    if not active_scrapers:  # If empty, use all available scrapers
-        active_scrapers = list(scraper_mapping.keys())
+    from ..utils.scrape.youtube import is_youtube_url
     
-    logger.info(f"Attempting to scrape {url} with scrapers: {active_scrapers}")
+    logger.info(f"Attempting to scrape URL: {url}")
     
-    for scraper_name in active_scrapers:
-        scraper_func = scraper_mapping.get(scraper_name)
-        if not scraper_func:
-            logger.warning(f"Unknown scraper: {scraper_name}")
-            continue
-            
-        try:
-            logger.info(f"Trying {scraper_name} for URL: {url}")
-            result = await scraper_func(url)
-            if result:
-                logger.info(f"Successfully scraped with {scraper_name}")
-                return {
-                    **result,
-                    "scraper_used": scraper_name,
-                    "scrape_status": "success"
-                }
-            logger.warning(f"{scraper_name} failed for URL: {url}")
-        except Exception as e:
-            logger.error(f"Error with {scraper_name} for URL {url}: {str(e)}")
-            
-    logger.warning(f"All scrapers failed for URL: {url}")
+    try:
+        # Get active scrapers from config or use all available
+        active_scrapers = config.scraping_engines
+        if not active_scrapers:
+            active_scrapers = list(scraper_mapping.keys())
+
+        # Check if it's a YouTube URL
+        if is_youtube_url(url):
+            logger.info(f"Detected YouTube URL: {url}")
+            youtube_scraper = scraper_mapping.get("youtube")
+            if youtube_scraper:
+                result = await youtube_scraper(url)
+                if result:
+                    return {
+                        **result,
+                        "scraper_used": "youtube",
+                        "scrape_status": "success"
+                    }
+                logger.warning(f"YouTube scraper failed for URL: {url}")
+        else:
+            # For non-YouTube URLs, try all active scrapers except YouTube
+            logger.info(f"Non-YouTube URL detected, trying other scrapers")
+            for scraper_name in active_scrapers:
+                # Skip YouTube scraper for non-YouTube URLs
+                if scraper_name == "youtube":
+                    continue
+                    
+                scraper_func = scraper_mapping.get(scraper_name)
+                if not scraper_func:
+                    logger.warning(f"Unknown scraper: {scraper_name}")
+                    continue
+                    
+                try:
+                    logger.info(f"Trying {scraper_name} for URL: {url}")
+                    result = await scraper_func(url)
+                    if result:
+                        logger.info(f"Successfully scraped with {scraper_name}")
+                        return {
+                            **result,
+                            "scraper_used": scraper_name,
+                            "scrape_status": "success"
+                        }
+                    logger.warning(f"{scraper_name} failed for URL: {url}")
+                except Exception as e:
+                    logger.error(f"Error with {scraper_name} for URL {url}: {str(e)}")
+                    
+    except Exception as e:
+        logger.error(f"Error scraping URL {url}: {str(e)}")
+    
+    # Return failure status if all attempts fail
     return {
         "url": url,
         "scrape_status": "failure"

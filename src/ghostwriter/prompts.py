@@ -96,3 +96,23 @@ Content: {content}
 
 Respond with either 'relevant' or 'not_relevant' followed by a brief explanation.
 """
+
+CONTENT_VERIFICATION_PROMPT = """Analyze the following content and check if it contains any new information not already present in the knowledge base. 
+
+Content to analyze: {combined_content}
+
+Return a JSON response with the following structure:
+{
+    "is_present": boolean,  // whether the content is already in knowledge base
+    "reason": string,      // explanation of why content is considered new or existing
+    "new_content": string, // extract of any new information found (empty if none)
+    "summary": string      // brief summary of what's new (empty if none)
+}
+
+Focus on:
+- Identifying new facts, developments, or updates
+- Extracting only information that adds value
+- Highlighting what makes the content unique
+- Providing clear reasoning for the decision
+
+Return only the JSON response."""
