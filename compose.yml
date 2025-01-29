@@ -44,6 +44,8 @@ services:
       timeout: 10s
       retries: 5
       start_period: 10s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   langgraph-api:
     build:
       context: .
