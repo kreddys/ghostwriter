@@ -35,11 +35,11 @@ async def validate_image(url: str) -> bool:
 
 async def search_google_images(query: str, num_results: int = 3) -> Optional[List[Dict]]:
     """Search for images using Google Custom Search API."""
-    api_key = os.getenv("GOOGLE_CSE_API_KEY")
-    cx = os.getenv("GOOGLE_CSE_CX")
+    api_key = os.getenv("GOOGLE_API_KEY")
+    cx = os.getenv("GOOGLE_CSE_ID")
     
     if not api_key or not cx:
-        logger.warning("Google CSE API key or CX not configured")
+        logger.warning("Google CSE API key or CSE ID not configured")
         return None
         
     url = "https://customsearch.googleapis.com/customsearch/v1"

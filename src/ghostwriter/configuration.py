@@ -23,7 +23,7 @@ class Configuration:
     )
 
     search_engines: list[str] = field(
-        default_factory=lambda: ["youtube"], #["google", "tavily", "serp", "youtube"]
+        default_factory=lambda: ["google", "tavily", "serp", "youtube"],
         metadata={
             "description": "List of search engines to use. Options: 'google', 'tavily', 'serp', 'youtube'. "
             "Empty list will use all available engines."
@@ -31,7 +31,7 @@ class Configuration:
     )
 
     max_search_results: int = field(
-        default=1,
+        default=10,
         metadata={
             "description": "The maximum number of search results to return for each search query."
         },
