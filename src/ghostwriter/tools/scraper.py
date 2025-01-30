@@ -118,16 +118,7 @@ async def scrape_multiple_urls(
     return results
 
 async def process_scrape(state: State, config: RunnableConfig) -> State:
-    """
-    Process URLs from search results and update with crawled content.
-    
-    Args:
-        state: Current workflow state containing search_results
-        config: Runnable configuration
-        
-    Returns:
-        Updated state with scraped content
-    """
+    """Execute scraping process."""
     logger.info("Starting scrape process")
     
     # Initialize scraper state
@@ -137,57 +128,41 @@ async def process_scrape(state: State, config: RunnableConfig) -> State:
             'scrape_successful': False
         }
     scraper_state = state.tool_states['scraper']
-    
-    # Get configuration
-    configuration = Configuration.from_runnable_config(config)
-    
-    # Get search results from searcher state
-    searcher_state = state.tool_states.get('searcher', {})
-    search_results = searcher_state.get('search_results', {})
-    
-    # Process each search result
-    for query_key, results in search_results.items():
-        if not results:
-            continue
-            
-        # Get URLs to crawl
-        urls = [result.get('url') for result in results if result.get('url')]
+
+    try:
+        # Get search results
+        searcher_state = state.tool_states.get('searcher', {})
+        search_results = searcher_state.get('search_results', {})
         
-        # Scrape URLs using the utility
-        scraped_data = await scrape_multiple_urls(urls, configuration)
-        
-        # Create URL to scraped data mapping
-        scraped_data_map = {data['url']: data for data in scraped_data if data}
-        
-        # Update results with scraped content
-        scraped_results = []
-        for result in results:
-            url = result.get('url')
-            if not url:
-                result['scrape_status'] = 'failure'
-                scraped_results.append(result)
+        if not search_results:
+            logger.warning("No search results to scrape")
+            scraper_state['scrape_successful'] = False
+            return state
+
+        # Process each query's results
+        for query, results in search_results.items():
+            if not isinstance(results, list):
                 continue
                 
-            scrape_result = scraped_data_map.get(url)
-            if scrape_result and scrape_result.get('scrape_status') == 'success':
-                scraped_results.append({
-                    **result,
-                    'title': scrape_result.get('title', result.get('title')),
-                    'content': scrape_result.get('content', result.get('content')),
-                    'metadata': {
-                        **(result.get('metadata', {})),
-                        **(scrape_result.get('metadata', {}))
-                    },
-                    'scrape_status': 'success',
-                    'scraper_used': scrape_result.get('scraper_used')
-                })
-            else:
-                result['scrape_status'] = 'failure'
-                scraped_results.append(result)
+            logger.info(f"Attempting to scrape URLs for query: {query}")
+            scraped_results = await scrape_multiple_urls(
+                [result['url'] for result in results],
+                Configuration.from_runnable_config(config)
+            )
+            
+            # Add this check to stop if no valid results
+            if not scraped_results or all(not result.get('content') for result in scraped_results):
+                logger.error("No valid content obtained from scraping")
+                scraper_state['scrape_successful'] = False
+                return state
                 
-        # Store scraped results in scraper state
-        scraper_state['scraped_results'][query_key] = scraped_results
+            scraper_state['scraped_results'][query] = scraped_results
+            logger.info(f"Successfully scraped {len(scraped_results)} results for query: {query}")
+            
         scraper_state['scrape_successful'] = True
-        logger.info(f"Successfully scraped {len(scraped_results)} results for query: {query_key}")
+        return state
         
-    return state
+    except Exception as e:
+        logger.error(f"Error in scraping process: {str(e)}")
+        scraper_state['scrape_successful'] = False
+        return state

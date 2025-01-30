@@ -32,13 +32,18 @@ async def uniqueness_checker(
     checker_state = state.tool_states['checker']
     
     try:
-        # Check if we have direct_url results from searcher
-        searcher_state = state.tool_states.get('searcher', {})
-        search_results = searcher_state.get('search_results', {})
         
-        # Proceed with normal verification for non-direct URLs
         logger.info("Fetching scraper results...")
+
+        # Check scraper state first
         scraper_state = state.tool_states.get('scraper', {})
+        if not scraper_state.get('scrape_successful', False):
+            logger.warning("=== Scraping was not successful ===")
+            logger.warning("Skipping uniqueness check - scraping failed")
+            checker_state['check_successful'] = False
+            return state
+            
+        # Get scraped results
         scraped_results = scraper_state.get('scraped_results', {})
         
         if not scraped_results:
@@ -55,6 +60,7 @@ async def uniqueness_checker(
         total_unique = 0
         
         logger.info(f"\n=== Processing {len(scraped_results)} Queries ===")
+        
         for query, results in scraped_results.items():
             if not isinstance(results, list):
                 continue
