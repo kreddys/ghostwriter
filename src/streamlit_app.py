@@ -5,6 +5,7 @@ import json
 import asyncio
 from dotenv import load_dotenv
 from auth.authenticate import Authenticator
+from ghostwriter.configuration import Configuration 
 
 # Load environment variables
 load_dotenv()
@@ -19,20 +20,19 @@ authenticator = Authenticator(
 )
 
 # Default configuration values matching configuration.py
+default_config = Configuration()
 DEFAULT_CONFIG = {
-    "system_prompt": "The system prompt to use for the agent's interactions",
-    "model": "deepseek/deepseek-v3",
-    "search_engines": ["tavily"],
-    "max_search_results": 2,
-    "sites_list": None,
-    "search_days": 7,
-    "slack_enabled": True,
-    "slack_format_code_blocks": True,
-    "use_query_generator": False,
-    "use_url_filtering": False,
-    "use_search_enricher": False,
-    "similarity_threshold": 0.80,
-    "relevance_similarity_threshold": 0.90
+    "search_engines": default_config.search_engines,
+    "max_search_results": default_config.max_search_results,
+    "sites_list": default_config.sites_list,
+    "search_days": default_config.search_days,
+    "slack_enabled": default_config.slack_enabled,
+    "slack_format_code_blocks": default_config.slack_format_code_blocks,
+    "use_query_generator": default_config.use_query_generator,
+    "use_url_filtering": default_config.use_url_filtering,
+    "use_search_enricher": default_config.use_search_enricher,
+    "similarity_threshold": default_config.similarity_threshold,
+    "relevance_similarity_threshold": default_config.relevance_similarity_threshold
 }
 
 # Configuration

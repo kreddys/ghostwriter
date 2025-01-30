@@ -31,7 +31,7 @@ class Configuration:
     )
 
     max_search_results: int = field(
-        default=10,
+        default=2,
         metadata={
             "description": "The maximum number of search results to return for each search query."
         },
@@ -122,6 +122,9 @@ class Configuration:
             "description": "Timeout in seconds for LightRAG API calls"
         }
     )
+
+    chunk_size: int = 500
+    chunk_overlap: int = 50
 
     @classmethod
     def from_runnable_config(
