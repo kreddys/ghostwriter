@@ -120,28 +120,44 @@ async def check_uniqueness(
     results: list,
     configuration: Configuration
 ) -> dict:
-    """Check if a set of results is unique using LightRAG."""
+    """Check if a set of results is unique using LightRAG.
+    
+    Args:
+        results: List of content results to check for uniqueness
+        configuration: Configuration object containing settings including timeout
+        
+    Returns:
+        dict: Contains uniqueness check results with fields:
+            - is_unique (bool): Whether content is unique
+            - reason (str): Explanation of the decision
+            - new_content (str): Any new content found
+            - summary (str): Brief summary of findings
+    """
     try:
         # Get endpoint and API key from environment variables
         lightrag_endpoint = os.getenv("LIGHTRAG_ENDPOINT")
         lightrag_apikey = os.getenv("LIGHTRAG_APIKEY")
 
         if not lightrag_endpoint or not lightrag_apikey:
+            logger.error("Missing LightRAG credentials in environment variables")
             raise ValueError("LIGHTRAG_ENDPOINT or LIGHTRAG_APIKEY is not set in the .env file.")
         
-        # Validate input results
+        # Input validation
         if not results or not isinstance(results, list):
+            logger.error(f"Invalid results format: {type(results)}")
             raise ValueError("Invalid results format - expected non-empty list")
 
-        # Log the endpoint being used (without the API key)
+        # Log configuration
         logger.info(f"Using LightRAG endpoint: {lightrag_endpoint}")
+        logger.info(f"Configured timeout: {configuration.lightrag_timeout} seconds")
 
-        # Combine results content into a single string for LightRAG query
+        # Combine and validate content
         combined_content = "\n".join([result.get('content', '') for result in results])
         if not combined_content.strip():
+            logger.error("No content found in results")
             raise ValueError("No content found in results to check uniqueness")
         
-        # Query LightRAG to check uniqueness of the combined content
+        # Prepare query data
         query_data = {
             "query": CONTENT_VERIFICATION_PROMPT.format(combined_content=combined_content),
             "mode": "hybrid",
@@ -149,52 +165,101 @@ async def check_uniqueness(
             "only_need_context": False,
         }
 
+        # Make API request with configurable timeout
         logger.info("Sending request to LightRAG API...")
-        response = requests.post(
-            lightrag_endpoint,
-            headers={
-                "Content-Type": "application/json",
-                "X-API-Key": lightrag_apikey,
-            },
-            json=query_data,
-            timeout=30  # Add timeout
-        )
-        
-        # Log response status and headers
-        logger.info(f"Response status code: {response.status_code}")
-        logger.info(f"Response headers: {dict(response.headers)}")
-        
-        response.raise_for_status()
+        try:
+            response = requests.post(
+                lightrag_endpoint,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-API-Key": lightrag_apikey,
+                },
+                json=query_data,
+                timeout=configuration.lightrag_timeout
+            )
+            
+            logger.info(f"Response status code: {response.status_code}")
+            logger.debug(f"Response headers: {dict(response.headers)}")
+            
+            response.raise_for_status()
+            
+        except requests.Timeout:
+            logger.error(f"LightRAG API request timed out after {configuration.lightrag_timeout} seconds")
+            return {
+                'is_unique': False,
+                'reason': f"Request timed out after {configuration.lightrag_timeout} seconds",
+                'new_content': '',
+                'summary': 'Timeout error occurred'
+            }
+        except requests.ConnectionError:
+            logger.error("Failed to connect to LightRAG API")
+            return {
+                'is_unique': False,
+                'reason': "Connection to LightRAG API failed",
+                'new_content': '',
+                'summary': 'Connection error occurred'
+            }
+        except requests.RequestException as e:
+            logger.error(f"Request to LightRAG API failed: {str(e)}")
+            return {
+                'is_unique': False,
+                'reason': f"API request failed: {str(e)}",
+                'new_content': '',
+                'summary': 'Request error occurred'
+            }
 
-        # Parse the API response
+        # Parse API response
         try:
             rag_response = response.json()
             logger.info("Successfully parsed JSON response")
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {str(e)}")
             logger.error(f"Raw response: {response.text}")
-            raise
+            return {
+                'is_unique': False,
+                'reason': "Failed to parse API response",
+                'new_content': '',
+                'summary': 'JSON parsing error'
+            }
 
         # Extract JSON from Markdown code block
         json_match = re.search(r'```json\n({.*?})\n```', rag_response.get('response', ''), re.DOTALL)
         if not json_match:
             logger.error(f"Failed to extract JSON from response: {rag_response}")
-            raise ValueError("Failed to extract JSON from LightRAG response")
+            return {
+                'is_unique': False,
+                'reason': "Failed to extract JSON from response",
+                'new_content': '',
+                'summary': 'JSON extraction error'
+            }
         
+        # Parse extracted JSON
         try:
             uniqueness_info = json.loads(json_match.group(1))
             logger.info(f"Parsed uniqueness info: {uniqueness_info}")
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse extracted JSON: {str(e)}")
             logger.error(f"Extracted text: {json_match.group(1)}")
-            raise
+            return {
+                'is_unique': False,
+                'reason': "Failed to parse extracted JSON",
+                'new_content': '',
+                'summary': 'JSON parsing error'
+            }
 
         # Validate required fields
         required_fields = ['is_present', 'reason', 'new_content', 'summary']
         missing_fields = [field for field in required_fields if field not in uniqueness_info]
         if missing_fields:
-            raise ValueError(f"API response missing required fields: {missing_fields}")
+            logger.error(f"Missing required fields in response: {missing_fields}")
+            return {
+                'is_unique': False,
+                'reason': f"API response missing required fields: {missing_fields}",
+                'new_content': '',
+                'summary': 'Invalid response format'
+            }
 
+        # Return successful response
         return {
             'is_unique': not uniqueness_info['is_present'],
             'reason': uniqueness_info['reason'],
@@ -202,15 +267,11 @@ async def check_uniqueness(
             'summary': uniqueness_info['summary']
         }
         
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Request to LightRAG API failed: {str(e)}")
-        return {
-            'is_unique': False,
-            'reason': f"API request failed: {str(e)}"
-        }
     except Exception as e:
-        logger.error(f"Error checking uniqueness: {str(e)}", exc_info=True)
+        logger.error(f"Unexpected error checking uniqueness: {str(e)}", exc_info=True)
         return {
             'is_unique': False,
-            'reason': f"Error: {str(e)}"
+            'reason': f"Unexpected error: {str(e)}",
+            'new_content': '',
+            'summary': 'System error occurred'
         }

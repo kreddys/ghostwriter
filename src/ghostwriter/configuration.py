@@ -116,6 +116,13 @@ class Configuration:
         }
     )
 
+    lightrag_timeout: float = field(
+        default=120.0,
+        metadata={
+            "description": "Timeout in seconds for LightRAG API calls"
+        }
+    )
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None
