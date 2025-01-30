@@ -102,12 +102,12 @@ CONTENT_VERIFICATION_PROMPT = """Analyze the following content and check if it c
 Content to analyze: {combined_content}
 
 Return a JSON response with the following structure:
-{
+{{
     "is_present": boolean,  // whether the content is already in knowledge base
     "reason": string,      // explanation of why content is considered new or existing
     "new_content": string, // extract of any new information found (empty if none)
     "summary": string      // brief summary of what's new (empty if none)
-}
+}}
 
 Focus on:
 - Identifying new facts, developments, or updates
