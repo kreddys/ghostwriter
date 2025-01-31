@@ -1,11 +1,9 @@
 import os
 import streamlit as st
 import httpx
-import json
 import asyncio
 from dotenv import load_dotenv
 from auth.authenticate import Authenticator
-from ghostwriter.configuration import Configuration 
 
 # Load environment variables
 load_dotenv()
@@ -16,27 +14,31 @@ authenticator = Authenticator(
     allowed_users=allowed_users,
     token_key=os.getenv("TOKEN_KEY"),
     secret_path="client_secret.json",
-    redirect_uri="http://localhost:8501",
+    redirect_uri=os.getenv("REDIRECT_URI", "http://localhost:8501")
 )
 
-# Default configuration values matching configuration.py
-default_config = Configuration()
+# Hardcoded configuration
 DEFAULT_CONFIG = {
-    "search_engines": default_config.search_engines,
-    "max_search_results": default_config.max_search_results,
-    "sites_list": default_config.sites_list,
-    "search_days": default_config.search_days,
-    "slack_enabled": default_config.slack_enabled,
-    "slack_format_code_blocks": default_config.slack_format_code_blocks,
-    "use_query_generator": default_config.use_query_generator,
-    "use_url_filtering": default_config.use_url_filtering,
-    "use_search_enricher": default_config.use_search_enricher,
-    "similarity_threshold": default_config.similarity_threshold,
-    "relevance_similarity_threshold": default_config.relevance_similarity_threshold
+    "search_engines": ["google", "tavily", "serp", "youtube"],
+    "max_search_results": 2,
+    "sites_list": None,  # None means search the entire web
+    "search_days": 7,
+    "slack_enabled": True,
+    "slack_format_code_blocks": True,
+    "use_query_generator": False,
+    "use_url_filtering": False,
+    "use_search_enricher": False,
+    "similarity_threshold": 0.80,
+    "relevance_similarity_threshold": 0.90,
+    "scraping_engines": ["firecrawl", "youtube"],
+    "topic": "Amaravati Capital City, Andhra Pradesh",
+    "lightrag_timeout": 120.0,
+    "chunk_size": 500,
+    "chunk_overlap": 50,
 }
 
 # Configuration
-FASTAPI_URL = "http://fastapi-wrapper:8000"
+FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8000")
 
 async def call_fastapi(content: str, config: dict):
     """Call FastAPI endpoint with content and configuration"""
@@ -87,7 +89,7 @@ def show_app_content():
         config = {
             "search_engines": st.multiselect(
                 "Search Engines",
-                options=["google", "tavily", "serp"],
+                options=["google", "tavily", "serp", "youtube"],
                 default=DEFAULT_CONFIG["search_engines"]
             ),
             "max_search_results": st.number_input(
