@@ -14,14 +14,6 @@ from ghostwriter import prompts
 class Configuration:
     """The configuration for the agent."""
 
-    model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
-        default="deepseek/deepseek-v3",
-        metadata={
-            "description": "The name of the language model to use for the agent's main interactions. "
-            "Should be in the form: provider/model-name."
-        },
-    )
-
     search_engines: list[str] = field(
         default_factory=lambda: ["google", "tavily", "serp", "youtube"],
         metadata={
