@@ -2,75 +2,19 @@ volumes:
   langgraph-data:
     driver: local
 services:
-  langgraph-redis:
-    image: redis:6
-    healthcheck:
-      test: redis-cli ping
-      interval: 5s
-      timeout: 1s
-      retries: 5
-  langgraph-postgres:
-    image: postgres:16
-    ports:
-      - "5433:5432"
-    environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - langgraph-data:/var/lib/postgresql/data
-    healthcheck:
-      test: pg_isready -U postgres
-      start_period: 10s
-      timeout: 1s
-      retries: 5
-      interval: 5s
   lightrag-api:
     build:
-      context: ../lightrag_pinecone_embed
+      context: ../lightrag-pinecone
       dockerfile: Dockerfile
     ports:
       - "${PORT:-9621}:9621"
     env_file:
-      - .env
+      - ../lightrag-pinecone/.env
     environment:
       - TZ=UTC
     volumes:
-      - ./data/rag_storage:/app/data/rag_storage
-      - ./data/inputs:/app/data/inputs
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://lightrag-api:9621/health" ]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 10s
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-  langgraph-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.langgraph
-    ports:
-      - "8123:8000"
-    depends_on:
-      langgraph-redis:
-        condition: service_healthy
-      langgraph-postgres:
-        condition: service_healthy
-      lightrag-api:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      REDIS_URI: redis://langgraph-redis:6379
-      DATABASE_URI: postgres://postgres:postgres@langgraph-postgres:5432/postgres
-      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY}
-      LANGGRAPH_CLOUD_LICENSE_KEY: ${LANGGRAPH_CLOUD_LICENSE_KEY}
-      LANGSERVE_GRAPHS: '{"agent": "/app/src/ghostwriter/graph.py:graph"}'
-      STORE_CONFIG: '{"index": {"embed": "openai:text-embedding-3-small", "dims": 1536}}'
-    volumes:
-      - ./src:/app/src
-
+      - ../lightrag-pinecone/data/rag_storage:/app/data/rag_storage
+      - ../lightrag-pinecone/data/inputs:/app/data/inputs
   fastapi-wrapper:
     build:
       context: .

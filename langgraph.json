@@ -1,4 +1,5 @@
 {
+  "docker_compose_file": "compose.yml",
   "dockerfile_lines": [],
   "graphs": {
     "agent": "./src/ghostwriter/graph.py:graph"

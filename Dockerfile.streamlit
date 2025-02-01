@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Copy only necessary files
 COPY requirements-streamlit.txt .
+COPY client_secret.json .
 COPY src/streamlit_app.py .
 COPY src/logging.conf .
 COPY src/auth ./auth
@@ -23,6 +24,8 @@ COPY --from=builder /root/.local /root/.local
 COPY --from=builder /app/streamlit_app.py .
 COPY --from=builder /app/logging.conf .
 COPY --from=builder /app/auth ./auth
+
+COPY client_secret.json .
 
 # Ensure .local/bin is in PATH and set PYTHONPATH
 ENV PATH=/root/.local/bin:$PATH
