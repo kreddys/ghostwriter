@@ -1,14 +1,12 @@
-"""GhostWriter.
-
-This module defines an AI-powered news article generation and publishing system.
-It manages workflows for content creation and CMS integration.
-"""
-
+import os
 import logging
 import logging.config
 
+# Get the directory containing logging.conf
+config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logging.conf')
+
 # Use logging.conf instead of basicConfig
-logging.config.fileConfig('logging.conf', disable_existing_loggers=False)
+logging.config.fileConfig(config_path, disable_existing_loggers=False)
 
 # Create logger for this package
 logger = logging.getLogger('ghostwriter')
