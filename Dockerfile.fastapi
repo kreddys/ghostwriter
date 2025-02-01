@@ -2,27 +2,24 @@
 FROM python:3.11-slim as builder
 
 WORKDIR /app
-COPY . .
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    gcc \
-    build-essential \
-    curl \
-    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    && . $HOME/.cargo/env \
-    && pip install --user --no-warn-script-location langgraph fastapi uvicorn httpx \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Copy only necessary files
+COPY requirements-fastapi.txt .
+COPY src/fastapi_app.py .
+COPY src/logging.conf .
+
+RUN pip install --user --no-warn-script-location -r requirements-fastapi.txt
+ENV PYTHONPATH=/app
 
 # Runtime stage
 FROM python:3.11-slim
 
 WORKDIR /app
 COPY --from=builder /root/.local /root/.local
-COPY --from=builder /app/src /app/src
+COPY --from=builder /app/fastapi_app.py .
+COPY --from=builder /app/logging.conf .
 
 ENV PATH=/root/.local/bin:$PATH
-ENV PYTHONPATH=/app/src/ghostwriter
+ENV PYTHONPATH=/app
 
 CMD ["uvicorn", "src.fastapi_app:app", "--host", "0.0.0.0", "--port", "8000"]

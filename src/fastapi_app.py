@@ -11,12 +11,12 @@ from langgraph.pregel.remote import RemoteGraph
 
 app = FastAPI()
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(name)s %(message)s'
-)
+# Load logging configuration
+import logging.config
+logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
+logger.info("FastAPI app starting up")
+logger.debug("Environment variables: %s", os.environ)
 
 class RunCreateRequest(BaseModel):
     input: dict
