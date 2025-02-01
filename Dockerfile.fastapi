@@ -15,7 +15,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 COPY --from=builder /root/.local /root/.local
-COPY --from=builder /app/src /app/src
+COPY --from=builder /app/src/fastapi_app.py /app/src/fastapi_app.py
+COPY --from=builder /app/src/logging.conf /app/src/logging.conf
 
 ENV PATH=/root/.local/bin:$PATH
 

@@ -23,8 +23,8 @@ dependencies = [
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
     "youtube-transcript-api>=0.6.1",
+    "sentry-sdk>=2.0.0",
 ]
-
 [project.optional-dependencies]
 dev = ["mypy>=1.11.1", "ruff>=0.6.1"]
 
