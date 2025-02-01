@@ -44,7 +44,6 @@ async def create_run(request: RunCreateRequest):
         # Stream the response back to the client
         async def generate():
             try:
-                
                 # Prepare LangGraph config with proper structure
                 langgraph_config = {
                     "configurable": {
@@ -124,3 +123,10 @@ async def create_run(request: RunCreateRequest):
     except Exception as e:
         logger.error(f"Run creation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# Determine the host based on the environment
+host = "fly-local-6pn" if os.getenv("FLY_APP_NAME") else "localhost"
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host=host, port=8000)

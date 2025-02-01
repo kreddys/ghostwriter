@@ -2,11 +2,19 @@ import os
 import streamlit as st
 import httpx
 import asyncio
+import logging
+import logging.config
 from dotenv import load_dotenv
 from auth.authenticate import Authenticator
 
 # Load environment variables
 load_dotenv()
+
+# Load logging configuration
+logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
+logger = logging.getLogger(__name__)
+logger.info("Streamlit app starting up")
+logger.debug("Environment variables: %s", os.environ)
 
 # Initialize authentication
 allowed_users = os.getenv("ALLOWED_USERS").split(",")
@@ -51,6 +59,7 @@ async def call_fastapi(content: str, config: dict):
         }
         
         try:
+            logger.info(f"Sending request to FastAPI: {FASTAPI_URL}/runs")
             async with client.stream(
                 "POST",
                 f"{FASTAPI_URL}/runs",
@@ -68,8 +77,10 @@ async def call_fastapi(content: str, config: dict):
                         full_response += chunk
                         response_container.text(full_response)
                 
+                logger.info("Request to FastAPI completed successfully")
                 return {"response": full_response}
         except Exception as e:
+            logger.error(f"Error calling FastAPI: {str(e)}")
             return {"error": str(e)}
 
 def show_app_content():
@@ -159,13 +170,17 @@ def show_app_content():
     if st.button("Submit"):
         with st.spinner("Processing..."):
             try:
+                logger.info("Starting request to FastAPI")
                 result = asyncio.run(call_fastapi(content, config))
                 if "error" in result:
+                    logger.error(f"Error in FastAPI response: {result['error']}")
                     st.error(f"Error: {result['error']}")
                 else:
+                    logger.info("Request to FastAPI completed successfully")
                     st.success("Request successful!")
                     st.json(result)
             except Exception as e:
+                logger.error(f"Error in Streamlit app: {str(e)}")
                 st.error(f"Error: {str(e)}")
 
 # Check authentication
@@ -174,13 +189,16 @@ authenticator.login()
 
 # Show app content only if authenticated
 if st.session_state.get("connected"):
+    logger.info(f"User {st.session_state['user_info'].get('email')} logged in")
     st.write(f"Welcome! {st.session_state['user_info'].get('email')}")
     if st.button("Log out"):
+        logger.info("User logged out")
         authenticator.logout()
         st.rerun()
     
     show_app_content()
 else:
+    logger.info("User not authenticated")
     st.write("Please log in to access the application")
 
 if __name__ == "__main__":
