@@ -5,15 +5,10 @@ It manages workflows for content creation and CMS integration.
 """
 
 import logging
+import logging.config
 
-# Configure logging for detailed console output
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
+# Use logging.conf instead of basicConfig
+logging.config.fileConfig('logging.conf', disable_existing_loggers=False)
 
 # Create logger for this package
 logger = logging.getLogger('ghostwriter')
