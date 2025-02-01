@@ -13,7 +13,7 @@ app = FastAPI()
 
 # Load logging configuration
 import logging.config
-logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
+logging.config.fileConfig("src/logging.conf", disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
 logger.info("FastAPI app starting up")
 logger.debug("Environment variables: %s", os.environ)
@@ -125,7 +125,7 @@ async def create_run(request: RunCreateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Determine the host based on the environment
-host = "fly-local-6pn" if os.getenv("FLY_APP_NAME") else "localhost"
+host = "0.0.0.0" if os.getenv("FLY_APP_NAME") else "localhost"
 
 if __name__ == "__main__":
     import uvicorn

@@ -5,21 +5,19 @@ WORKDIR /app
 
 # Copy only necessary files
 COPY requirements-fastapi.txt .
-COPY src/fastapi_app.py .
-COPY src/logging.conf .
+COPY src/fastapi_app.py src/
+COPY src/logging.conf src/
 
 RUN pip install --user --no-warn-script-location -r requirements-fastapi.txt
-ENV PYTHONPATH=/app
 
 # Runtime stage
 FROM python:3.11-slim
 
 WORKDIR /app
 COPY --from=builder /root/.local /root/.local
-COPY --from=builder /app/fastapi_app.py .
-COPY --from=builder /app/logging.conf .
+COPY --from=builder /app/src /app/src
 
 ENV PATH=/root/.local/bin:$PATH
-ENV PYTHONPATH=/app
 
+# Update the CMD to use the correct path to logging.conf
 CMD ["uvicorn", "src.fastapi_app:app", "--host", "0.0.0.0", "--port", "8000"]
