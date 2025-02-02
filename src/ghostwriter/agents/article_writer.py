@@ -1,6 +1,5 @@
-"""Article Writer Agent functionality."""
-
 import os
+import json
 import logging
 from typing import Dict, List
 from langchain_core.messages import SystemMessage
@@ -10,7 +9,7 @@ from ..prompts import ARTICLE_WRITER_PROMPT
 from ..state import State
 from ..configuration import Configuration
 from ghostwriter.utils.publish.api import fetch_ghost_tags
-from ..llm import get_llm 
+from ..llm import get_llm
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,8 @@ async def article_writer_agent(
 ) -> State:
     """
     Agent that processes unique results and generates articles.
-    Uses the standard tool pattern with tool-specific state.
+    Generates plain text articles, including both title and content, 
+    which can later be converted to Lexical format.
     """
     logger.info("=== Starting Article Writer ===")
     
@@ -71,17 +71,14 @@ async def article_writer_agent(
             for result in results:
                 writer_state['processed_results'] += 1
                 url = result.get('url', 'No URL')
-                title = result.get('title', 'No title')
                 
-                logger.info(f"Generating article for: {title}")
-                logger.info(f"Source URL: {url}")
+                logger.info(f"Generating article from: {url}")
                 
                 try:
-                    # Generate article content with tags
+                    # Generate article title and content
                     messages = [
                         SystemMessage(
                             content=ARTICLE_WRITER_PROMPT.format(
-                                title=title,
                                 content=result.get('content', 'N/A'),
                                 tag_names=tag_names
                             )
@@ -89,11 +86,13 @@ async def article_writer_agent(
                     ]
                     
                     response = await model.ainvoke(messages)
-                    article_content = response.content
+                    response_data = json.loads(response.content.strip())
+                    article_title = response_data.get("title", "Untitled Article")
+                    article_content = response_data.get("content", "")
                     
-                    # Store generated article
+                    # Store generated article in plain text format
                     articles.append({
-                        'title': title,
+                        'title': article_title,
                         'content': article_content,
                         'source_url': url,
                         'query': query,

@@ -4,12 +4,8 @@ import logging
 import requests
 import json
 import re
-from typing import Dict, Annotated
-from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import InjectedToolArg
-from ...state import State
+from typing import Dict
 from ...configuration import Configuration
-from ...utils.verify.url_filter_supabase import filter_existing_urls
 from ...prompts import CONTENT_VERIFICATION_PROMPT
 from ...utils.verify.checker_utils import truncate_content
 from ...utils.verify.llm_summarizer import summarize_content

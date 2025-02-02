@@ -8,6 +8,7 @@ from ghostwriter.tools.searcher import process_search
 from ghostwriter.tools.scraper import process_scrape
 from ghostwriter.tools.publisher import publish_to_ghost
 from ghostwriter.tools.notifier import notify
+from ghostwriter.tools.formatter import formatter
 from typing import Literal
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ def create_graph() -> StateGraph:
     workflow.add_node("scrape", process_scrape)
     workflow.add_node("verify", verifier)
     workflow.add_node("generate", article_writer_agent)
+    workflow.add_node("format", formatter)
     workflow.add_node("publish", publish_to_ghost)
     workflow.add_node("notify", notify)
     
@@ -77,7 +79,8 @@ def create_graph() -> StateGraph:
     
     # Add the other edges
     workflow.set_entry_point("search")
-    workflow.add_edge("generate", "publish")
+    workflow.add_edge("generate", "format")
+    workflow.add_edge("format", "publish")
     workflow.add_edge("publish", "notify")
     workflow.add_edge("notify", END)
     

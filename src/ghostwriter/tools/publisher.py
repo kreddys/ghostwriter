@@ -22,12 +22,12 @@ async def publish_to_ghost(state: State, config: RunnableConfig) -> State:
     pub_state = state.tool_states['publisher']
     
     try:
-        # Get articles from article writer state
-        writer_state = state.tool_states.get('article_writer', {})
-        articles = writer_state.get('articles', [])
+        # Get formatted articles from formatter state
+        formatter_state = state.tool_states.get('formatter', {})
+        articles = formatter_state.get('formatted_articles', [])
         
         if not articles:
-            logger.info("No articles found to publish")
+            logger.info("No formatted articles found to publish")
             pub_state['publish_successful'] = False
             return state
             

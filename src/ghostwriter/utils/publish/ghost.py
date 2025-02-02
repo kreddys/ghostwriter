@@ -39,12 +39,15 @@ async def ghost_publisher(
         
         async with aiohttp.ClientSession() as session:
             for message in messages:
+                logger.info(f"Message before cleanup: {message}")
                 try:
                     # Handle both AIMessage and dict formats
                     if hasattr(message, 'content'):
                         content = message.content.strip()
                     else:
                         content = message.get('content', '').strip()
+
+                    logger.info(f"Content before cleanup: {content}")
                     
                     # Clean up the content by removing markdown code block markers
                     if content.startswith("```json"):
@@ -52,6 +55,8 @@ async def ghost_publisher(
                     if content.endswith("```"):
                         content = content[:-3]  # Remove ```
                     content = content.strip()
+
+                    logger.info(f"Content after cleanup: {content}")
                     
                     if not content:
                         logger.error("Empty content after cleanup")

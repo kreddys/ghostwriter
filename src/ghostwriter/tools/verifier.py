@@ -7,6 +7,7 @@ from ..state import State
 from ..configuration import Configuration
 from ..utils.verify.url_filter_supabase import filter_existing_urls
 from ..utils.verify.uniqueness_checker import check_uniqueness
+from ..utils.verify.relevance_checker import RelevanceChecker
 
 logger = logging.getLogger(__name__)
 
@@ -15,14 +16,15 @@ async def verifier(
     state: State,
     config: Annotated[RunnableConfig, InjectedToolArg()]
 ) -> State:
-    """Filter and return unique search results using LightRAG."""
-    logger.info("=== Starting Uniqueness Checker ===")
+    """Filter and return unique and relevant search results using LightRAG."""
+    logger.info("=== Starting Uniqueness and Relevance Checker ===")
     
     # Initialize checker state
     if 'checker' not in state.tool_states:
         state.tool_states['checker'] = {
             'unique_results': {},
             'non_unique_results': {},
+            'relevant_results': {},
             'check_successful': False,
             'decision_details': {}
         }
@@ -45,9 +47,18 @@ async def verifier(
         configuration = Configuration.from_runnable_config(config)
         use_url_filtering = configuration.use_url_filtering
         
+        # Initialize RelevanceChecker
+        relevance_checker = RelevanceChecker(
+            topic=configuration.topic,  # Replace with the actual topic
+            threshold=configuration.relevance_similarity_threshold,  # Replace with the desired threshold
+            configuration=configuration
+        )
+        
         unique_results = {}
+        relevant_results = {}
         total_processed = 0
         total_unique = 0
+        total_relevant = 0
         
         logger.info(f"Processing {len(scraped_results)} queries")
         
@@ -65,42 +76,63 @@ async def verifier(
                 filtered_results = results
             
             source_unique_results = []
+            source_relevant_results = []
             
             # Process each result independently
             for result in filtered_results:
                 total_processed += 1
                 
-                # Check uniqueness for individual result
-                uniqueness_check = await check_uniqueness(result, configuration)
-                
-                if uniqueness_check['is_unique']:
-                    total_unique += 1
-                    source_unique_results.append(result)
-                    logger.info(f"✓ Accepted URL (unique): {uniqueness_check['url']}")
+                # Check relevance first
+                is_relevant = await relevance_checker.is_relevant(result['content'])
+                if is_relevant:
+                    total_relevant += 1
+                    source_relevant_results.append(result)
+                    logger.info(f"✓ Relevant URL: {result['url']}")
+                    
+                    # Check uniqueness for relevant results
+                    uniqueness_check = await check_uniqueness(result, configuration)
+                    
+                    if uniqueness_check['is_unique']:
+                        total_unique += 1
+                        source_unique_results.append(result)
+                        logger.info(f"✓ Accepted URL (unique): {uniqueness_check['url']}")
+                    else:
+                        logger.info(f"✗ Rejected URL (not unique): {uniqueness_check['url']}")
+                    
+                    # Store decision details
+                    checker_state['decision_details'][uniqueness_check['url']] = {
+                        'relevance': is_relevant,
+                        'uniqueness': uniqueness_check
+                    }
                 else:
-                    logger.info(f"✗ Rejected URL (not unique): {uniqueness_check['url']}")
-                
-                # Store decision details
-                checker_state['decision_details'][uniqueness_check['url']] = uniqueness_check
+                    logger.info(f"✗ Rejected URL (not relevant): {result['url']}")
+                    checker_state['decision_details'][result['url']] = {
+                        'relevance': is_relevant,
+                        'uniqueness': {'is_unique': False}
+                    }
             
             if source_unique_results:
                 unique_results[query] = source_unique_results
+            if source_relevant_results:
+                relevant_results[query] = source_relevant_results
         
         # Update checker state
         checker_state['unique_results'] = unique_results
+        checker_state['relevant_results'] = relevant_results
         if unique_results:
             checker_state['check_successful'] = True
         else:
             checker_state['check_successful'] = False
         
-        logger.info("\n=== Uniqueness Checker Summary ===")
+        logger.info("\n=== Uniqueness and Relevance Checker Summary ===")
         logger.info(f"Total results processed: {total_processed}")
+        logger.info(f"Relevant results found: {total_relevant}")
         logger.info(f"Unique results found: {total_unique}")
-        logger.info(f"Final unique results: {sum(len(results) for results in unique_results.values())}")
+        logger.info(f"Final relevant and unique results: {sum(len(results) for results in unique_results.values())}")
 
         return state
         
     except Exception as e:
-        logger.error(f"Error in uniqueness checker: {str(e)}")
+        logger.error(f"Error in uniqueness and relevance checker: {str(e)}")
         checker_state['check_successful'] = False
         raise

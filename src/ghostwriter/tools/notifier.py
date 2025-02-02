@@ -28,7 +28,7 @@ async def notify(state: State, config: RunnableConfig) -> State:
         
         if not published_urls:
             logger.info("No published articles found to notify")
-            notify_state['notify_successful'] = True
+            notify_state['notify_successful'] = False
             return state
             
         # Send notifications for each published article

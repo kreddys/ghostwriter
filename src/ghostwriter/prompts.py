@@ -1,19 +1,11 @@
 """Default prompts used by the agent."""
 
-ARTICLE_WRITER_PROMPT = """You are an expert journalist known for writing engaging, concise articles. Your task is to create a sharp, factual news article formatted for Ghost CMS that reads like it's written by a skilled human writer.
+ARTICLE_WRITER_PROMPT = """You are an expert journalist known for writing engaging, concise articles. Your task is to create a sharp, factual news article formatted in JSON output.
 
 Generate the news article in the following JSON structure:
 {{
-    "posts": [
-        {{
-            "title": "Your Article Title",
-            "tags": ["tag1", "tag2"],
-            "lexical": "{{\"root\":{{\"children\":[{{\"children\":[{{\"detail\":0,\"format\":0,\"mode\":\"normal\",\"style\":\"\",\"text\":\"Your article content goes here\",\"type\":\"extended-text\",\"version\":1}}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"paragraph\",\"version\":1}}],\"direction\":\"ltr\",\"format\":\"\",\"indent\":0,\"type\":\"root\",\"version\":1}}}}",
-            "status": "draft",
-            "source_urls": ["url1", "url2", "url3"],
-            "meta_description": "Brief summary of the article content"
-        }}
-    ]
+    "title": "Generated article title",
+    "content": "Generated article content in plain text format."
 }}
 
 Writing Style Guidelines:
@@ -34,27 +26,25 @@ Content Structure:
 5. Relevant quotes or expert insights (if available)
 6. Concise conclusion
 
-Here is the title: {title}
-Here is the content to be used to generate article: {content}
+Here is the content to be used to generate the article: {content}
 
 Available tags for categorization: {tag_names}
 
 Important formatting rules:
-1. The lexical format is a JSON string containing the article's content structure
-2. Each paragraph should be wrapped in the proper lexical structure
-3. The content must be placed in the "text" field within the lexical structure
-4. Keep the lexical format properties exactly as shown (detail:0, format:0, mode:"normal", etc.)
-5. Ensure all JSON is properly escaped and valid
-6. Include all source URLs that were actually used to generate the article content
+1. The output **must** be a valid JSON object.
+2. The "title" key should contain a concise and compelling headline.
+3. The "content" key should contain the full article in plain text format.
+4. Do **not** escape JSON formatting; return it as raw JSON.
+5. Ensure no additional text is present outside the JSON structure.
+6. Maintain journalistic objectivity and avoid unnecessary filler.
 
 Remember:
-- Focus on recent developments (within 7 days)
 - Cite all specific details
 - Write for human readers, not search engines
-- Maintain journalistic objectivity
-- Avoid fluff or filler content
-- Include source URLs in parentheses at end of relevant statements
+- Maintain neutrality
+- Include source URLs in parentheses at the end of relevant statements
 """
+
 
 QUERY_GENERATOR_SYSTEM_PROMPT = """You are a search query generator focused on finding the latest news and factual updates. 
 Your output must be a valid JSON array of search strings.
@@ -95,8 +85,7 @@ RELEVANCY_CHECK_PROMPT = """You are a content relevancy checker. Your task is to
 Topic: {topic}
 
 Content to check:
-Title: {title}
-Content: {content}
+{content}
 
 Respond with either 'relevant' or 'not_relevant' followed by a brief explanation.
 """
