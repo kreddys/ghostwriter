@@ -1,5 +1,24 @@
 import os
 import streamlit as st
+import sentry_sdk
+from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.tracing import start_transaction
+
+# Initialize Sentry
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),  # Use the Sentry DSN from the .env file
+    integrations=[LoggingIntegration()],
+    traces_sample_rate=1.0,  # Capture 100% of transactions for performance monitoring
+    send_default_pii=True,  # Automatically capture personally identifiable information
+)
+
+# Function to add breadcrumbs
+def add_breadcrumb(category, message, level="info"):
+    sentry_sdk.add_breadcrumb(
+        category=category,
+        message=message,
+        level=level
+    )
 import httpx
 import asyncio
 import logging
@@ -202,4 +221,26 @@ else:
     st.write("Please log in to access the application")
 
 if __name__ == "__main__":
-    pass
+    with start_transaction(op="task", description="Streamlit App Execution"):
+        try:
+            # Check authentication
+            authenticator.check_auth()
+            authenticator.login()
+
+            # Show app content only if authenticated
+            if st.session_state.get("connected"):
+                logger.info(f"User {st.session_state['user_info'].get('email')} logged in")
+                st.write(f"Welcome! {st.session_state['user_info'].get('email')}")
+                if st.button("Log out"):
+                    logger.info("User logged out")
+                    authenticator.logout()
+                    st.rerun()
+                
+                show_app_content()
+            else:
+                logger.info("User not authenticated")
+                st.write("Please log in to access the application")
+        except Exception as e:
+            logger.error(f"Error in Streamlit app: {str(e)}")
+            sentry_sdk.capture_exception(e)
+            st.error(f"Error: {str(e)}")

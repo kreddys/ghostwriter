@@ -9,12 +9,26 @@ from datetime import datetime
 import uuid
 from langgraph.pregel.remote import RemoteGraph
 
-app = FastAPI()
-
 # Load logging configuration
 import logging.config
 logging.config.fileConfig("src/logging.conf", disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
+
+import sentry_sdk
+try:
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        debug=False,
+        traces_sample_rate=0.0,  # Disable tracing
+        send_default_pii=True,
+        auto_session_tracking=True,
+        max_breadcrumbs=0,  # Disable breadcrumbs
+    )
+    logger.info("Sentry SDK initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize Sentry SDK: {str(e)}", exc_info=True)
+
+app = FastAPI()
 logger.info("FastAPI app starting up")
 logger.debug("Environment variables: %s", os.environ)
 
