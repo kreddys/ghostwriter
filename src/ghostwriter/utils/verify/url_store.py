@@ -2,7 +2,7 @@
 import logging
 from langchain_core.runnables import RunnableConfig
 from ghostwriter.state import State
-from ghostwriter.utils.unique.url_store_supabase import supabase_url_store
+from ghostwriter.utils.verify.url_store_supabase import supabase_url_store
 
 logger = logging.getLogger(__name__)
 

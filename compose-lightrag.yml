@@ -1,0 +1,17 @@
+volumes:
+  langgraph-data:
+    driver: local
+services:
+  lightrag-api:
+    build:
+      context: ../lightrag-pinecone
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-9621}:9621"
+    env_file:
+      - ../lightrag-pinecone/.env
+    environment:
+      - TZ=UTC
+    volumes:
+      - ../lightrag-pinecone/data/rag_storage:/app/data/rag_storage
+      - ../lightrag-pinecone/data/inputs:/app/data/inputs

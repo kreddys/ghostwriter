@@ -120,3 +120,5 @@ Focus on:
 - Providing clear reasoning for the decision
 
 Return only the JSON response."""
+
+LLM_SUMMARIZER_PROMPT = """Summarize the following text, extracting its main theme in a concise manner within 500 characters: {content}"""

@@ -3,7 +3,7 @@ import logging
 from langgraph.graph import StateGraph, END
 from ghostwriter.state import State, InputState
 from ghostwriter.agents.article_writer import article_writer_agent
-from ghostwriter.tools.verifier import uniqueness_checker
+from ghostwriter.tools.verifier import verifier
 from ghostwriter.tools.searcher import process_search
 from ghostwriter.tools.scraper import process_scrape
 from ghostwriter.tools.publisher import publish_to_ghost
@@ -47,7 +47,7 @@ def create_graph() -> StateGraph:
     # Add the nodes
     workflow.add_node("search", process_search)
     workflow.add_node("scrape", process_scrape)
-    workflow.add_node("verify", uniqueness_checker)
+    workflow.add_node("verify", verifier)
     workflow.add_node("generate", article_writer_agent)
     workflow.add_node("publish", publish_to_ghost)
     workflow.add_node("notify", notify)
