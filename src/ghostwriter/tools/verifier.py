@@ -6,7 +6,6 @@ from langchain_core.tools import InjectedToolArg
 from ..state import State
 from ..configuration import Configuration
 from ..utils.verify.url_filter_supabase import filter_existing_urls
-from ..utils.verify.uniqueness_checker import check_uniqueness
 from ..utils.verify.relevance_checker import RelevanceChecker
 
 logger = logging.getLogger(__name__)
@@ -29,7 +28,7 @@ async def verifier(
             'decision_details': {}
         }
     checker_state = state.tool_states['checker']
-    
+
     try:
         # Get scraper results
         scraper_state = state.tool_states.get('scraper', {})
@@ -46,6 +45,7 @@ async def verifier(
             
         configuration = Configuration.from_runnable_config(config)
         use_url_filtering = configuration.use_url_filtering
+        skip_uniqueness_checker = configuration.skip_uniqueness_checker
         
         # Initialize RelevanceChecker
         relevance_checker = RelevanceChecker(
@@ -57,7 +57,6 @@ async def verifier(
         unique_results = {}
         relevant_results = {}
         total_processed = 0
-        total_unique = 0
         total_relevant = 0
         
         logger.info(f"Processing {len(scraped_results)} queries")
@@ -89,20 +88,13 @@ async def verifier(
                     source_relevant_results.append(result)
                     logger.info(f"✓ Relevant URL: {result['url']}")
                     
-                    # Check uniqueness for relevant results
-                    uniqueness_check = await check_uniqueness(result, configuration)
-                    
-                    if uniqueness_check['is_unique']:
-                        total_unique += 1
+                    if skip_uniqueness_checker:
                         source_unique_results.append(result)
-                        logger.info(f"✓ Accepted URL (unique): {uniqueness_check['url']}")
-                    else:
-                        logger.info(f"✗ Rejected URL (not unique): {uniqueness_check['url']}")
+                        logger.info(f"✓ Directly accepting URL as unique: {result['url']}")
                     
-                    # Store decision details
-                    checker_state['decision_details'][uniqueness_check['url']] = {
+                    checker_state['decision_details'][result['url']] = {
                         'relevance': is_relevant,
-                        'uniqueness': uniqueness_check
+                        'uniqueness': {'is_unique': skip_uniqueness_checker}
                     }
                 else:
                     logger.info(f"✗ Rejected URL (not relevant): {result['url']}")
@@ -119,16 +111,12 @@ async def verifier(
         # Update checker state
         checker_state['unique_results'] = unique_results
         checker_state['relevant_results'] = relevant_results
-        if unique_results:
-            checker_state['check_successful'] = True
-        else:
-            checker_state['check_successful'] = False
+        checker_state['check_successful'] = bool(unique_results)
         
         logger.info("\n=== Uniqueness and Relevance Checker Summary ===")
         logger.info(f"Total results processed: {total_processed}")
         logger.info(f"Relevant results found: {total_relevant}")
-        logger.info(f"Unique results found: {total_unique}")
-        logger.info(f"Final relevant and unique results: {sum(len(results) for results in unique_results.values())}")
+        logger.info(f"Final unique results: {sum(len(results) for results in unique_results.values())}")
 
         return state
         

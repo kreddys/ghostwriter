@@ -28,7 +28,7 @@ def get_llm(
     return ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
-        openai_api_base=os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"),
+        openai_api_base=os.getenv("OPENAI_API_BASE"),
         temperature=temperature,
         max_tokens=max_tokens,
     )

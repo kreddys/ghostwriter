@@ -115,6 +115,8 @@ class Configuration:
         }
     )
 
+    skip_uniqueness_checker=True,  # Set to True to skip verifier checks
+
     chunk_size: int = 500
     chunk_overlap: int = 50
 
