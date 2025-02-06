@@ -79,6 +79,11 @@ async def verifier(
             
             # Process each result independently
             for result in filtered_results:
+                
+                if result.get('scrape_status') != 'success':
+                    logger.info(f"✗ Skipped URL (scrape_status not success): {result['url']}")
+                    continue    
+                
                 total_processed += 1
                 
                 # Check relevance first

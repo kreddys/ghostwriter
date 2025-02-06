@@ -23,7 +23,7 @@ class Configuration:
     )
 
     max_search_results: int = field(
-        default=2,
+        default=5,
         metadata={
             "description": "The maximum number of search results to return for each search query."
         },
