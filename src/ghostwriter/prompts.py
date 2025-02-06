@@ -17,14 +17,13 @@ ARTICLE_WRITER_PROMPT = """You are an expert journalist known for writing engagi
 - Use bullet points where necessary.
 
 ### **Content Structure:**
-1. **Title inside `<title>`**
-2. **Strong opening hook** (`<h1>` or `<p>`)  
-3. **Key facts & developments** (`<p>`)
-4. **Context or background** (`<p>`)
-5. **Impact or significance** (`<p>`)
-6. **Relevant quotes or insights** (`<blockquote>` if available)
-7. **Conclusion** (`<p>`)
-8. **Tag metadata at the end** (`<meta name='tags' content='tag1, tag2'>`)
+1. **Title inside `<title>`** 
+2. **Key facts & developments** (`<p>`)
+3. **Context or background** (`<p>`)
+4. **Impact or significance** (`<p>`)
+5. **Relevant quotes or insights** (`<blockquote>` if available)
+6. **Conclusion** (`<p>`)
+7. **Tag metadata at the end** (`<meta name='tags' content='tag1, tag2'>`)
 
 ### **Example Output:**
 ```html

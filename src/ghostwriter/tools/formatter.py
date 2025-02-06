@@ -37,15 +37,9 @@ async def formatter(state: State) -> State:
             # Clean and structure the HTML content using BeautifulSoup
             soup = BeautifulSoup(article['content'], "html.parser")
             
-            # Remove duplicate title in body if present
-            if soup.title and soup.body:
-                title_text = soup.title.get_text(strip=True)
-                body_text = soup.body.get_text(strip=True)
-                if title_text in body_text:
-                    for tag in soup.body.find_all():
-                        if tag.get_text(strip=True) == title_text:
-                            tag.extract()
-                            break
+            # Remove all <h1> tags from the content
+            for h1_tag in soup.find_all('h1'):
+                h1_tag.extract()
             
             html_content = str(soup.prettify())
             
