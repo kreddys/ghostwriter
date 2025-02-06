@@ -20,7 +20,7 @@ async def ghost_publisher(
     state: State,
     publish_status: str = "draft"
 ) -> bool:
-    """Send articles to Ghost CMS as drafts while preserving Lexical format."""
+    """Send articles to Ghost CMS as drafts while preserving HTML format."""
     logger.info("Starting Ghost Publisher")
     
     try:
@@ -38,19 +38,17 @@ async def ghost_publisher(
         
         async with aiohttp.ClientSession() as session:
             for message in messages:
-                logger.info(f"Processing article: {message}")
                 try:
-                    # Directly extract title, lexical content, and tags from message
+                    # Extract title, HTML content, and tags from message
                     title = message.get("title", "Untitled")
-                    lexical_content = message.get("lexical", "")
+                    html_content = message.get("html", "")
                     tags = message.get("tags", [])
 
-                    # Validate Lexical format
-                    if not is_valid_lexical(lexical_content):
-                        logger.error(f"Invalid Lexical format in post: {title}")
+                    if not html_content.strip():
+                        logger.error(f"Empty HTML content in post: {title}")
                         continue
-
-                        # Fetch images based on title
+                    
+                    # Fetch images based on title
                     images = await search_images(title)
                     featured_image = images[0]["url"] if images else None
                     
@@ -58,7 +56,7 @@ async def ghost_publisher(
                     post_data = {
                         "posts": [{
                             "title": title,
-                            "lexical": lexical_content,  # Preserve Lexical format
+                            "html": html_content,  # Use HTML format instead of Lexical
                             "tags": [{"name": tag} for tag in tags],
                             "status": publish_status,
                             "feature_image": featured_image
@@ -66,7 +64,7 @@ async def ghost_publisher(
                     }
                     
                     # Send data to Ghost API
-                    url = f"{ghost_url}/ghost/api/admin/posts/"
+                    url = f"{ghost_url}/ghost/api/admin/posts/?source=html"
                     headers = {
                         "Authorization": f"Ghost {generate_ghost_token(ghost_admin_api_key)}",
                         "Accept-Version": "v5.0",
@@ -95,14 +93,4 @@ async def ghost_publisher(
         
     except Exception as e:
         logger.error(f"Unexpected error in Ghost publisher: {str(e)}", exc_info=True)
-        return False
-
-
-def is_valid_lexical(lexical_content: str) -> bool:
-    """Validate Lexical JSON structure."""
-    try:
-        data = json.loads(lexical_content)
-        return "root" in data and "children" in data["root"]
-    except Exception as e:
-        logger.error(f"Lexical validation failed: {e}")
         return False

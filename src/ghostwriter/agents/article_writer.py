@@ -2,6 +2,7 @@ import os
 import logging
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
+from bs4 import BeautifulSoup
 from ..prompts import ARTICLE_WRITER_PROMPT
 from ..state import State
 from ..configuration import Configuration
@@ -16,7 +17,7 @@ async def article_writer_agent(
 ) -> State:
     """
     Agent that processes unique results and generates articles.
-    Generates plain text articles, including title, content, and tags.
+    Generates **HTML-formatted** articles, including title, content, and tags.
     """
     logger.info("=== Starting Article Writer ===")
     
@@ -71,7 +72,7 @@ async def article_writer_agent(
                 logger.info(f"Generating article from: {url}")
 
                 try:
-                    # Generate article title, content, and tags
+                    # Generate article in **HTML format**
                     messages = [
                         SystemMessage(
                             content=ARTICLE_WRITER_PROMPT.format(
@@ -82,34 +83,21 @@ async def article_writer_agent(
                     ]
 
                     response = await model.ainvoke(messages)
-                    response_text = response.content.strip()
+                    response_html = response.content.strip()
 
-                    # Split the response into lines and clean extra newlines
-                    lines = [line.strip() for line in response_text.split("\n") if line.strip()]
+                    # Parse HTML
+                    soup = BeautifulSoup(response_html, "html.parser")
                     
-                    # Check if there are enough lines to process
-                    if len(lines) < 3:
-                        raise ValueError("Generated article is too short or missing essential content")
+                    # Extract title
+                    article_title = soup.title.string if soup.title else "Untitled"
 
-                    # Search for the first and last separator dynamically
-                    try:
-                        first_separator_idx = lines.index('---')
-                        last_separator_idx = len(lines) - 1 - lines[::-1].index('---')
-
-                        # Ensure both separators are found
-                        if first_separator_idx >= last_separator_idx:
-                            raise ValueError("Invalid article format: separators are in the wrong order")
-                    except ValueError:
-                        raise ValueError("Article format does not contain valid separators")
-
-                    # Extract title (everything before the first separator)
-                    article_title = "\n".join(lines[:first_separator_idx]).strip()
-
-                    # Extract content (everything between the first and last separator)
-                    article_content = "\n".join(lines[first_separator_idx + 1:last_separator_idx]).strip()
-
-                    # Extract tags (last line after the second separator)
-                    article_tags = [tag.strip() for tag in lines[last_separator_idx + 1].split(",") if tag.strip()]
+                    # Extract content
+                    article_body = str(soup.body) if soup.body else ""
+                    
+                    # Extract tags from meta tag
+                    meta_tag = soup.find("meta", attrs={"name": "tags"})
+                    article_tags = meta_tag["content"].split(",") if meta_tag else []
+                    article_tags = [tag.strip() for tag in article_tags]
 
                     if not article_tags:
                         raise ValueError("No tags found in the AI response")
@@ -117,7 +105,7 @@ async def article_writer_agent(
                     # Store generated article
                     articles.append({
                         'title': article_title,
-                        'content': article_content,
+                        'content': article_body,
                         'source_url': url,
                         'query': query,
                         'tags': article_tags
