@@ -25,6 +25,7 @@ dependencies = [
     "youtube-transcript-api>=0.6.1",
     "sentry-sdk>=2.0.0",
     "beautifulsoup4>=4.12.2",
+    "asyncpg>=0.29.0",
 ]
 [project.optional-dependencies]
 dev = ["mypy>=1.11.1", "ruff>=0.6.1"]

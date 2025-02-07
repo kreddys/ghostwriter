@@ -1,5 +1,7 @@
-"""Tool for checking uniqueness of search results using LightRAG."""
+import os
 import logging
+import requests
+import asyncpg
 from typing import Annotated
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
@@ -7,18 +9,59 @@ from ..state import State
 from ..configuration import Configuration
 from ..utils.verify.url_filter import filter_existing_urls
 from ..utils.verify.relevance_checker import RelevanceChecker
+from ..utils.verify.llm_summarizer import summarize_content  # Import the summarization function
 
 logger = logging.getLogger(__name__)
 
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+
+async def generate_embeddings(text: str):
+    """Generates vector embeddings using Pinecone."""
+    PINECONE_URL = "https://api.pinecone.io/embed"
+    HEADERS = {
+        "Api-Key": PINECONE_API_KEY,
+        "Content-Type": "application/json",
+        "X-Pinecone-API-Version": "2024-10"
+    }
+    
+    payload = {
+        "model": "multilingual-e5-large",
+        "parameters": {"input_type": "passage"},
+        "inputs": [{"text": text}]
+    }
+    
+    response = requests.post(PINECONE_URL, headers=HEADERS, json=payload)
+    
+    if response.status_code == 200:
+        return response.json()["data"][0]["values"]
+    else:
+        logger.error(f"Embedding API Error: {response.text}")
+        return None
+
+async def check_similarity_with_existing(embedding):
+    """Check if the embedding is similar to existing embeddings in the database."""
+    conn = await asyncpg.connect(os.getenv("DATABASE_URL"))
+    
+    query = """
+    SELECT id, title, url, 1 - (vector <=> $1) AS similarity
+    FROM post_embeddings
+    WHERE 1 - (vector <=> $1) > 0.85
+    ORDER BY similarity DESC
+    LIMIT 1;
+    """
+    
+    result = await conn.fetchrow(query, embedding)
+    await conn.close()
+    
+    return result if result else None
 
 async def verifier(
     state: State,
     config: Annotated[RunnableConfig, InjectedToolArg()]
 ) -> State:
-    """Filter and return unique and relevant search results using LightRAG."""
+    """Filter and return unique and relevant search results using LightRAG and Pinecone embeddings."""
     logger.info("=== Starting Uniqueness and Relevance Checker ===")
     
-    # Initialize checker state
     if 'checker' not in state.tool_states:
         state.tool_states['checker'] = {
             'unique_results': {},
@@ -49,8 +92,8 @@ async def verifier(
         
         # Initialize RelevanceChecker
         relevance_checker = RelevanceChecker(
-            topic=configuration.topic,  # Replace with the actual topic
-            threshold=configuration.relevance_similarity_threshold,  # Replace with the desired threshold
+            topic=configuration.topic,
+            threshold=configuration.relevance_similarity_threshold,
             configuration=configuration
         )
         
@@ -77,7 +120,6 @@ async def verifier(
             source_unique_results = []
             source_relevant_results = []
             
-            # Process each result independently
             for result in filtered_results:
                 
                 if result.get('scrape_status') != 'success':
@@ -93,13 +135,33 @@ async def verifier(
                     source_relevant_results.append(result)
                     logger.info(f"✓ Relevant URL: {result['url']}")
                     
-                    if skip_uniqueness_checker:
-                        source_unique_results.append(result)
-                        logger.info(f"✓ Directly accepting URL as unique: {result['url']}")
+                    # Summarize content
+                    summary = await summarize_content(result['content'], configuration)
+                    if not summary:
+                        logger.warning(f"Failed to summarize content for: {result['url']}")
+                        continue
                     
+                    logger.info(f"Summarized content: {summary[:200]}...")  # Log first 200 chars
+
+                    # Generate embeddings
+                    embedding = await generate_embeddings(summary)
+                    if not embedding:
+                        logger.warning(f"Failed to generate embeddings for: {result['url']}")
+                        continue
+
+                    # Check for similar content
+                    similar_article = await check_similarity_with_existing(embedding)
+
+                    if not similar_article:
+                        source_unique_results.append(result)
+                        logger.info(f"✓ Unique URL: {result['url']}")
+                    
+                    else:
+                        logger.info(f"✗ Non-unique (similar to {similar_article['url']}): {result['url']}")
+
                     checker_state['decision_details'][result['url']] = {
                         'relevance': is_relevant,
-                        'uniqueness': {'is_unique': skip_uniqueness_checker}
+                        'uniqueness': {'is_unique': not similar_article}
                     }
                 else:
                     logger.info(f"✗ Rejected URL (not relevant): {result['url']}")
