@@ -1,5 +1,7 @@
-"""Ghost publishing workflow."""
 import logging
+import os
+import psycopg2
+from psycopg2.extras import execute_values
 from langchain_core.runnables import RunnableConfig
 from ghostwriter.state import State
 from ghostwriter.utils.publish.ghost import ghost_publisher
@@ -8,11 +10,10 @@ logger = logging.getLogger(__name__)
 
 async def publish_to_ghost(state: State, config: RunnableConfig) -> State:
     """
-    Publish articles to Ghost as drafts using the standard tool pattern.
+    Publish articles to Ghost as drafts and store URLs in PostgreSQL if successful.
     """
     logger.info("=== Starting Ghost Publisher ===")
     
-    # Initialize tool state
     if 'publisher' not in state.tool_states:
         state.tool_states['publisher'] = {
             'articles_published': 0,
@@ -22,7 +23,6 @@ async def publish_to_ghost(state: State, config: RunnableConfig) -> State:
     pub_state = state.tool_states['publisher']
     
     try:
-        # Get formatted articles from formatter state
         formatter_state = state.tool_states.get('formatter', {})
         articles = formatter_state.get('formatted_articles', [])
         
@@ -30,8 +30,7 @@ async def publish_to_ghost(state: State, config: RunnableConfig) -> State:
             logger.info("No formatted articles found to publish")
             pub_state['publish_successful'] = False
             return state
-            
-        # Publish all articles as drafts
+        
         logger.info(f"Publishing {len(articles)} articles as drafts")
         published_urls = await ghost_publisher(articles, config=config, state=state, publish_status='draft')
         
@@ -40,6 +39,7 @@ async def publish_to_ghost(state: State, config: RunnableConfig) -> State:
             pub_state['publish_successful'] = True
             pub_state['published_urls'] = published_urls
             logger.info(f"Successfully published {len(published_urls)} articles as drafts")
+            
         else:
             pub_state['articles_failed'] = len(articles)
             logger.error("Failed to publish articles")

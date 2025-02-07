@@ -5,7 +5,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
 from ..state import State
 from ..configuration import Configuration
-from ..utils.verify.url_filter_supabase import filter_existing_urls
+from ..utils.verify.url_filter import filter_existing_urls
 from ..utils.verify.relevance_checker import RelevanceChecker
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ async def verifier(
             logger.info(f"Results to process: {len(results)}")
             
             if use_url_filtering:
-                filtered_results = await filter_existing_urls(results)
+                filtered_results = filter_existing_urls(results)
                 logger.info(f"Results after filtering: {len(filtered_results)}")
             else:
                 filtered_results = results
