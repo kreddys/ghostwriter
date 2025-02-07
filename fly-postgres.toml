@@ -6,6 +6,9 @@
 app = 'ghostwriter-postgres'
 primary_region = 'atl'
 
+[build]
+dockerfile = 'Dockerfile.postgres'
+
 [env]
 PRIMARY_REGION = 'atl'
 FLY_SCALE_TO_ZERO = "1h"
