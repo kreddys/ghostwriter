@@ -1,7 +1,6 @@
 import os
 import logging
 import asyncpg
-import requests
 from typing import Annotated
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import InjectedToolArg
@@ -10,29 +9,11 @@ from ..configuration import Configuration
 from ..utils.verify.url_filter import filter_existing_urls
 from ..utils.verify.relevance_checker import RelevanceChecker
 from ..utils.verify.llm_summarizer import summarize_content
+from ..embedding import generate_embeddings
 
 logger = logging.getLogger(__name__)
 
-async def generate_embeddings(text):
-    """Generates vector embeddings using Pinecone or OpenAI-compatible API."""
-    PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-    PINECONE_URL = "https://api.pinecone.io/embed"
-    HEADERS = {
-        "Api-Key": PINECONE_API_KEY,
-        "Content-Type": "application/json",
-        "X-Pinecone-API-Version": "2024-10"
-    }
-
-    payload = {"model": "multilingual-e5-large", "parameters": {"input_type": "passage"}, "inputs": [{"text": text}]}
-    response = requests.post(PINECONE_URL, headers=HEADERS, json=payload)
-
-    if response.status_code == 200:
-        return response.json()["data"][0]["values"]
-    else:
-        logging.error(f"Embedding API Error: {response.text}")
-        return None
-
-async def check_similarity_with_existing(embedding):
+async def check_similarity_with_existing(embedding, similarity_threshold):
     """Check if the embedding is similar to existing embeddings in the database."""
     conn = await asyncpg.connect(
         database=os.getenv("POSTGRES_DB"),
@@ -42,19 +23,25 @@ async def check_similarity_with_existing(embedding):
         port=os.getenv("POSTGRES_PORT"),
     )
 
-    # Convert embedding to a string formatted as a PostgreSQL vector
-    embedding_str = f"[{', '.join(map(str, embedding))}]"  # ✅ Convert list to PostgreSQL vector format
+    embedding_str = f"[{', '.join(map(str, embedding))}]" 
 
-    query = """
+    query = f"""
     SELECT id, title, url, 1 - (vector <=> $1::vector) AS similarity
     FROM post_embeddings
-    WHERE 1 - (vector <=> $1::vector) > 0.85
+    WHERE 1 - (vector <=> $1::vector) > {similarity_threshold}
     ORDER BY similarity DESC
     LIMIT 1;
     """
     
-    result = await conn.fetchrow(query, embedding_str)  # ✅ Pass as formatted string
+    result = await conn.fetchrow(query, embedding_str)
+
+    if result:
+        logger.info(f"Similar article found: ID={result['id']}, URL={result['url']}, Similarity={result['similarity']:.4f}")
+    else:
+        logger.info("No similar articles found. The content is unique.")
+
     await conn.close()
+    return result
 
 async def verifier(
     state: State,
@@ -86,6 +73,7 @@ async def verifier(
 
         configuration = Configuration.from_runnable_config(config)
         use_url_filtering = configuration.use_url_filtering
+        skip_uniqueness_checker = configuration.skip_uniqueness_checker
         
         # Initialize RelevanceChecker
         relevance_checker = RelevanceChecker(
@@ -135,13 +123,19 @@ async def verifier(
                     continue
                 logger.info(f"✓ Embeddings generated for URL:: {result['url']}")
 
-                # Check for similar content
-                similar_article = await check_similarity_with_existing(embedding)
-                if not similar_article:
-                    source_unique_results.append(result)
-                    logger.info(f"✓ Unique URL: {result['url']}")
+                # Skip uniqueness check if the flag is set
+                if not skip_uniqueness_checker:
+                    # Check for similar content
+                    similar_article = await check_similarity_with_existing(embedding, configuration.similarity_threshold)
+
+                    if not similar_article:
+                        source_unique_results.append(result)
+                        logger.info(f"✓ Unique URL: {result['url']}")
+                    else:
+                        logger.info(f"✗ Non-unique (similar to {similar_article['url']}): {result['url']}")
                 else:
-                    logger.info(f"✗ Non-unique (similar to {similar_article['url']}): {result['url']}")
+                    logger.info(f"Skipping uniqueness check for URL: {result['url']}")
+                    source_unique_results.append(result)
 
             if source_unique_results:
                 unique_results[query] = source_unique_results
@@ -156,4 +150,4 @@ async def verifier(
 
     except Exception as e:
         logger.error(f"Error in uniqueness and relevance checker: {str(e)}")
-        return {}
+        return state

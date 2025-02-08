@@ -78,7 +78,7 @@ class Configuration:
     )
 
     similarity_threshold: float = field(
-        default=0.80,
+        default=0.85,
         metadata={
             "description": "Threshold for determining content uniqueness using cosine similarity. Used to check existing posts in Ghost & suppress similar posts. "
             "Lower values are more strict (require more uniqueness)."
