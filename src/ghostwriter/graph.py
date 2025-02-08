@@ -26,8 +26,8 @@ def check_search_status(state: State) -> str:
 
 def should_generate_articles(state: State) -> Literal["generate", "end"]:
     """Determine if we should proceed with article generation."""
-    checker_state = state.tool_states.get('checker', {})
-    unique_results = checker_state.get('unique_results', {})
+    verifier_state = state.tool_states.get('verifier', {})
+    unique_results = verifier_state.get('unique_results', {})
     
     if not unique_results:
         logger.info("No unique results found - stopping the process")

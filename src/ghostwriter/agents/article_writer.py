@@ -34,8 +34,8 @@ async def article_writer_agent(
     
     try:
         # Get unique results from checker tool state
-        checker_state = state.tool_states.get('checker', {})
-        unique_results = checker_state.get('unique_results', {})
+        verifier_state = state.tool_states.get('verifier', {})
+        unique_results = verifier_state.get('unique_results', {})
 
         if not unique_results:
             logger.info("No unique results found - ending workflow")
