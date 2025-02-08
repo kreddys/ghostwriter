@@ -23,7 +23,7 @@ class Configuration:
     )
 
     max_search_results: int = field(
-        default=5,
+        default=10,
         metadata={
             "description": "The maximum number of search results to return for each search query."
         },
@@ -69,14 +69,6 @@ class Configuration:
         }
     )
 
-    use_search_enricher: bool = field(
-        default=False,
-        metadata={
-            "description": "Whether to use search enricher to find additional relevant content "
-            "or directly proceed to article writing with original results"
-        }
-    )
-
     similarity_threshold: float = field(
         default=0.85,
         metadata={
@@ -108,14 +100,12 @@ class Configuration:
         }
     )
 
-    lightrag_timeout: float = field(
-        default=120.0,
+    skip_uniqueness_checker: bool = field(
+        default=True,
         metadata={
-            "description": "Timeout in seconds for LightRAG API calls"
+            "description": "Whether to check for unique posts in ghost website"
         }
     )
-
-    skip_uniqueness_checker=True,  # Set to True to skip verifier checks
 
     chunk_size: int = 500
     chunk_overlap: int = 50

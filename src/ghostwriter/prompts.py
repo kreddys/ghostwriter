@@ -95,13 +95,18 @@ Rules for generating the search query:
 Return only the search query (2-3 words maximum), nothing else.
 """
 
-RELEVANCY_CHECK_PROMPT = """You are a content relevancy checker. Your task is to determine if the given content is relevant to the specified topic.
-Topic: {topic}
+RELEVANCY_CHECK_PROMPT = """
+Determine if the following content is relevant to the topic: {topic}
 
 Content to check:
 {content}
 
-Respond with either 'relevant' or 'not_relevant' followed by a brief explanation.
+Respond with either 'relevant' or 'not_relevant' at the start of your response, followed by a brief explanation.
+The response MUST start with either 'relevant' or 'not_relevant'.
+
+Example responses:
+'relevant: The content directly discusses the topic provided...'
+'not_relevant: The content discusses a different topic not relevant to the topic provided...'
 """
 
 CONTENT_VERIFICATION_PROMPT = """Analyze the following content and check if it contains any new information not already present in the knowledge base. 

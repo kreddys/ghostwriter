@@ -29,8 +29,20 @@ class RelevanceChecker:
         for attempt in range(self.max_retries):
             try:
                 response = await self.llm.ainvoke(messages)
-                result = response.content
-                return 1 if "relevant" in result.lower() else 0
+                result = response.content.lower().strip()
+                
+                # More precise checking of relevance response
+                if result.startswith("not_relevant"):
+                    logger.info(f"Content marked as not relevant: {result}")
+                    return 0
+                elif result.startswith("relevant"):
+                    logger.info(f"Content marked as relevant: {result}")
+                    return 1
+                else:
+                    logger.warning(f"Unexpected relevance response format: {result}")
+                    # Default to not relevant if format is unexpected
+                    return 0
+                    
             except Exception as e:
                 logger.error(f"Attempt {attempt + 1}: LLM relevance check failed: {e}")
                 if attempt < self.max_retries - 1:

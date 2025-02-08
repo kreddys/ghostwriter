@@ -5,10 +5,10 @@ import requests
 import json
 import re
 from typing import Dict
-from ...configuration import Configuration
-from ...prompts import CONTENT_VERIFICATION_PROMPT
-from ...utils.verify.checker_utils import truncate_content
-from ...utils.verify.llm_summarizer import summarize_content
+from ..src.ghostwriter.configuration import Configuration
+from ..src.ghostwriter.prompts import CONTENT_VERIFICATION_PROMPT
+from ..src.ghostwriter.utils.verify.checker_utils import truncate_content
+from ..src.ghostwriter.utils.verify.llm_summarizer import summarize_content
 
 logger = logging.getLogger(__name__)
 
