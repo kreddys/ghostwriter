@@ -6,7 +6,7 @@ SELECT * FROM pg_extension WHERE extname = 'vector';
 
 INSERT INTO test_embeddings (embedding) VALUES ('[0.1, 0.2, 0.3]');
 
-SELECT * FROM test_embeddings;
+SELECT * FROM post_embeddings;
 
 SELECT *
 	FROM post_embeddings;
