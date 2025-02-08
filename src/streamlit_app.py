@@ -2,7 +2,7 @@ import os
 import streamlit as st
 import sentry_sdk
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.tracing import start_transaction
+from sentry_sdk import start_transaction
 
 # Initialize Sentry
 sentry_sdk.init(
@@ -126,7 +126,7 @@ def show_app_content():
                     "meta-llama/llama-3.3-70b-instruct",
                     "deepseek/deepseek-r1:free"
                 ],
-                default=DEFAULT_CONFIG["llm_model"],
+                value=DEFAULT_CONFIG["llm_model"],
                 help="Select the Language Model to use"
             ),
             "embedding_model": st.selectbox(
@@ -135,7 +135,7 @@ def show_app_content():
                     "multilingual-e5-large",
                     "text-embedding-ada-002"
                 ],
-                default=DEFAULT_CONFIG["embedding_model"],
+                value=DEFAULT_CONFIG["embedding_model"],
                 help="Select the Embedding Model to use"
             )
         }
