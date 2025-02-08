@@ -46,22 +46,21 @@ authenticator = Authenticator(
 
 # Hardcoded configuration
 DEFAULT_CONFIG = {
+    "llm_model": "google/gemini-2.0-flash-lite-preview-02-05:free",  # Added
+    "embedding_model": "multilingual-e5-large",  # Added
     "search_engines": ["google", "tavily", "serp", "youtube"],
     "max_search_results": 2,
-    "sites_list": None,  # None means search the entire web
+    "sites_list": None,
     "search_days": 7,
     "slack_enabled": True,
     "slack_format_code_blocks": True,
     "use_query_generator": False,
     "use_url_filtering": False,
-    "use_search_enricher": False,
-    "similarity_threshold": 0.80,
+    "similarity_threshold": 0.85,  # Updated to match configuration.py
     "relevance_similarity_threshold": 0.90,
     "scraping_engines": ["firecrawl", "youtube"],
     "topic": "Amaravati Capital City, Andhra Pradesh",
-    "lightrag_timeout": 120.0,
-    "chunk_size": 500,
-    "chunk_overlap": 50,
+    "skip_uniqueness_checker": True,  # Added
 }
 
 # Configuration
@@ -109,14 +108,40 @@ def show_app_content():
     tab1 = st.tabs(["Main Interface"])[0]
     
     with tab1:
-        # Original app content
         content = st.text_area("Enter content", value="amaravati capital news")
         
-        # Configuration options
         st.sidebar.title("Configuration")
     
-    with st.sidebar.expander("Search Settings"):
+    # Add new Model Settings expander
+    with st.sidebar.expander("Model Settings"):
         config = {
+            "llm_model": st.selectbox(
+                "LLM Model",
+                options=[
+                    "google/gemini-2.0-flash-lite-preview-02-05:free",
+                    "google/gemini-flash-1.5",
+                    "google/gemini-2.0-flash-001",
+                    "openai/o1-mini",
+                    "openai/gpt-4o-mini",
+                    "meta-llama/llama-3.3-70b-instruct",
+                    "deepseek/deepseek-r1:free"
+                ],
+                default=DEFAULT_CONFIG["llm_model"],
+                help="Select the Language Model to use"
+            ),
+            "embedding_model": st.selectbox(
+                "Embedding Model",
+                options=[
+                    "multilingual-e5-large",
+                    "text-embedding-ada-002"
+                ],
+                default=DEFAULT_CONFIG["embedding_model"],
+                help="Select the Embedding Model to use"
+            )
+        }
+    
+    with st.sidebar.expander("Search Settings"):
+        config.update({
             "search_engines": st.multiselect(
                 "Search Engines",
                 options=["google", "tavily", "serp", "youtube"],
@@ -135,10 +160,9 @@ def show_app_content():
             "search_days": st.selectbox(
                 "Search Days",
                 options=[1, 3, 7, 14, 30],
-                index=2  # Default to 7 days
+                index=2
             )
-        }
-        # Convert sites_list from string to list
+        })
         config["sites_list"] = [s.strip() for s in config["sites_list"].split(",")] if config["sites_list"] else None
     
     with st.sidebar.expander("Content Settings"):
@@ -156,6 +180,11 @@ def show_app_content():
                 max_value=1.0,
                 value=DEFAULT_CONFIG["relevance_similarity_threshold"],
                 help="Threshold for content relevance (higher = more strict)"
+            ),
+            "skip_uniqueness_checker": st.checkbox(
+                "Skip Uniqueness Checker",
+                value=DEFAULT_CONFIG["skip_uniqueness_checker"],
+                help="Whether to skip checking for unique posts in ghost website"
             )
         })
     
@@ -178,11 +207,6 @@ def show_app_content():
                 "Use URL Filtering",
                 value=DEFAULT_CONFIG["use_url_filtering"],
                 help="Filter out URLs already in Supabase"
-            ),
-            "use_search_enricher": st.checkbox(
-                "Use Search Enricher",
-                value=DEFAULT_CONFIG["use_search_enricher"],
-                help="Find additional relevant content"
             )
         })
     

@@ -61,18 +61,31 @@ async def create_run(request: RunCreateRequest):
                 # Prepare LangGraph config with proper structure
                 langgraph_config = {
                     "configurable": {
-                        "thread_id": str(uuid.uuid4()),  # Generate new thread ID
-                        "search_engines": request.config.get("search_engines", ["tavily"]),
-                        "max_search_results": request.config.get("max_search_results", 2),
+                        "thread_id": str(uuid.uuid4()),
+                        # Model configurations
+                        "llm_model": request.config.get("llm_model", "google/gemini-2.0-flash-lite-preview-02-05:free"),
+                        "embedding_model": request.config.get("embedding_model", "multilingual-e5-large"),
+                        
+                        # Search configurations
+                        "search_engines": request.config.get("search_engines", ["google", "tavily", "serp", "youtube"]),
+                        "max_search_results": request.config.get("max_search_results", 5),
                         "sites_list": request.config.get("sites_list"),
                         "search_days": request.config.get("search_days", 7),
-                        "similarity_threshold": request.config.get("similarity_threshold", 0.8),
-                        "relevance_similarity_threshold": request.config.get("relevance_similarity_threshold", 0.9),
+                        
+                        # Similarity thresholds
+                        "similarity_threshold": request.config.get("similarity_threshold", 0.85),
+                        "relevance_similarity_threshold": request.config.get("relevance_similarity_threshold", 0.90),
+                        
+                        # Integration settings
                         "slack_enabled": request.config.get("slack_enabled", True),
                         "slack_format_code_blocks": request.config.get("slack_format_code_blocks", True),
                         "use_query_generator": request.config.get("use_query_generator", False),
                         "use_url_filtering": request.config.get("use_url_filtering", False),
-                        "use_search_enricher": request.config.get("use_search_enricher", False)
+                        
+                        # Scraping and processing settings
+                        "scraping_engines": request.config.get("scraping_engines", ["firecrawl", "youtube"]),
+                        "topic": request.config.get("topic", "Amaravati Capital City, Andhra Pradesh"),
+                        "skip_uniqueness_checker": request.config.get("skip_uniqueness_checker", True),
                     }
                 }
                 
