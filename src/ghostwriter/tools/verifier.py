@@ -117,7 +117,7 @@ async def verifier(
                 logger.info(f"✓ Relevant URL:: {result['url']}")
 
                 # Generate embeddings
-                embedding = await generate_embeddings(summary)
+                embedding = await generate_embeddings(summary, configuration)
                 if not embedding:
                     logger.warning(f"Failed to generate embeddings for: {result['url']}")
                     continue

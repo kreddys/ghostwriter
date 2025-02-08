@@ -14,6 +14,20 @@ from ghostwriter import prompts
 class Configuration:
     """The configuration for the agent."""
 
+    llm_model: str = field(
+        default="google/gemini-2.0-flash-lite-preview-02-05:free",
+        metadata={
+            "description": "The name of the LLM model to use"
+        }
+    )
+    
+    embedding_model: str = field(
+        default="multilingual-e5-large",
+        metadata={
+            "description": "The name of the Embedding model to use"
+        }
+    )
+
     search_engines: list[str] = field(
         default_factory=lambda: ["google", "tavily", "serp", "youtube"],
         metadata={

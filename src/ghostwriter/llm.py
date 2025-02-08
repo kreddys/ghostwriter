@@ -13,7 +13,7 @@ def get_llm(
     configuration: Configuration, temperature: float = 0.8, max_tokens: int = 4096
 ):
     """
-    Get the appropriate LLM based on environment variables.
+    Get the appropriate LLM based on configuration settings.
 
     Args:
         configuration: Configuration object containing model settings
@@ -23,10 +23,10 @@ def get_llm(
     Returns:
         Configured LLM instance
     """
-    logger.info("Initializing OpenAI-compatible model")
+    logger.info(f"Initializing OpenAI-compatible model: {configuration.llm_model}")
 
     return ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL"),
+        model=configuration.llm_model,  # Use model name from configuration
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_api_base=os.getenv("OPENAI_API_BASE"),
         temperature=temperature,
